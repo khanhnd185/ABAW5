@@ -4,7 +4,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-def get_dataset(filename, feature_dict, nameonly=False):
+def get_lsd_dataset(filename, feature_dict, nameonly=False):
     with open(filename) as f:
         mtl_lines = f.read().splitlines()
     num_missed=0
@@ -29,32 +29,39 @@ def get_dataset(filename, feature_dict, nameonly=False):
 
     return X,y_expr
 
-class LSD(Dataset):
-    def __init__(self, filename, feature_dict):
-        super(LSD, self).__init__()
-        self.X , self.y = get_dataset(filename, feature_dict)
+def get_abaw5_dataset(annoation_path, img_path):
+    X,y_expr=[],[]
+    filenames = os.listdir(annoation_path)
 
-    def __getitem__(self, i):
-        return self.X[i] , self.y[i]
-    def __len__(self):
-        return len(self.X)
+    for filename in filenames:
+        with open(annoation_path + filename) as f:
+            mtl_lines = f.read().splitlines()
 
-    def ex_weight(self):
-        unique, counts = np.unique(self.y.astype(int), return_counts=True)
-        emo_cw = 1 / counts
-        emo_cw/= emo_cw.min()
-        return emo_cw
+        for i, label in enumerate(mtl_lines[1:]):
+            expression = int(label)
+            if expression < 0:
+                continue
 
+            imagename = "{}/{:05d}.jpg".format(filename[:-4], i+1)
+            imagename = os.path.join(img_path, imagename)
+            if not os.path.isfile(imagename):
+                continue
+
+            X.append(imagename)
+            y_expr.append(expression)
+
+    y_expr=np.array(y_expr)
+    return X,y_expr
 
 def pil_loader(path):
     with open(path, 'rb') as f:
         with Image.open(f) as img:
             return img.convert('RGB')
 
-class RawLSD(Dataset):
+class LSD(Dataset):
     def __init__(self, filename, img_path):
-        super(RawLSD, self).__init__()
-        self.X , self.y = get_dataset(filename, {}, nameonly=True)
+        super(LSD, self).__init__()
+        self.X , self.y = get_lsd_dataset(filename, {}, nameonly=True)
         self.img_path = img_path
         self.transform = transforms.Compose(
             [
@@ -66,6 +73,32 @@ class RawLSD(Dataset):
         )
     def __getitem__(self, i):
         img = pil_loader(os.path.join(self.img_path, self.X[i]))
+        img = self.transform(img)
+        return img, self.y[i]
+
+    def __len__(self):
+        return len(self.X)
+
+    def ex_weight(self):
+        unique, counts = np.unique(self.y.astype(int), return_counts=True)
+        emo_cw = 1 / counts
+        emo_cw/= emo_cw.min()
+        return emo_cw
+
+class ABAW5(Dataset):
+    def __init__(self, annoation_path, image_path):
+        super(ABAW5, self).__init__()
+        self.X , self.y = get_abaw5_dataset(annoation_path, image_path)
+        self.transform = transforms.Compose(
+            [
+                transforms.Resize((224,224)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                            std=[0.229, 0.224, 0.225])
+            ]
+        )
+    def __getitem__(self, i):
+        img = pil_loader(self.X[i])
         img = self.transform(img)
         return img, self.y[i]
 

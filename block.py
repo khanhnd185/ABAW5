@@ -54,7 +54,7 @@ class Attention(nn.Module):
         return attention_weighted_encoding, alpha
 
 class AFER(nn.Module):
-    def __init__(self, train_backbone=False):
+    def __init__(self, num_class=8, train_backbone=False):
         super(AFER, self).__init__()
 
         self.backbone = torch.load('../MTL-ABAW3/model/enet_b0_8_best_vgaf.pt')
@@ -65,11 +65,11 @@ class AFER(nn.Module):
         feature_size = dim_score + dim_embedding
 
         self.attention = Attention(dim_embedding, 128)
-        self.ex = Dense(feature_size, 6, activation='softmax', drop=0.2)
+        self.ex = Dense(feature_size, num_class, activation='softmax', drop=0.2)
         self.ex = nn.Sequential(
             Dense(feature_size, 512, activation='relu', drop=0.2),
             Dense(512, 64, activation='relu', drop=0.2),
-            Dense(64, 6, activation='softmax'),
+            Dense(64, num_class, activation='softmax'),
         )
 
         self.backbone.global_pool = torch.nn.Identity()
@@ -96,12 +96,12 @@ class AFER(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, feature_size=1288):
+    def __init__(self, num_class=8, feature_size=1288):
         super(MLP, self).__init__()
         self.model = nn.Sequential(
             Dense(feature_size, 640, activation='relu', drop=0.2),
             Dense(640, 80, activation='relu', drop=0.2),
-            Dense(80, 6, activation='softmax'),
+            Dense(80, num_class, activation='softmax'),
         )
 
     def forward(self, x):

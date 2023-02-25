@@ -1,7 +1,7 @@
 import os
 import pickle
 import pandas as pd
-from dataset import LSD, RawLSD
+from dataset import LSD, ABAW5
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from helpers import *
@@ -10,19 +10,13 @@ import torch.optim as optim
 import argparse
 from sam import SAM
 
-batch_size = 256
-num_workers = 0
-DATA_DIR = '../../../Data/ABAW4/synthetic_challenge/'
-learning_rate = 1e-3
-early_stop = None
-
-def train(net, trainldr, optimizer, epoch, epochs, criteria):
+def train(net, trainldr, optimizer, epoch, epochs, criteria, lr):
     total_losses = AverageMeter()
     net.train()
     train_loader_len = len(trainldr)
     yhat = {}
     for batch_idx, (inputs, y) in enumerate(tqdm(trainldr)):
-        adjust_learning_rate(optimizer, epoch, epochs, learning_rate, batch_idx, train_loader_len)
+        adjust_learning_rate(optimizer, epoch, epochs, lr, batch_idx, train_loader_len)
         y = y.long()
         inputs = inputs.cuda()
         y = y.cuda()
@@ -63,13 +57,17 @@ def val(net, validldr, criteria):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Train LSD')
+    parser = argparse.ArgumentParser(description='Train Emotion')
 
-    parser.add_argument('--arc', '-a', default='AFER', help='Net name')
-    parser.add_argument('--input', '-i', default='', help='Input file')
-    parser.add_argument('--outdir', '-o', default='AFER', help='Output folder name')
-    parser.add_argument('--sam', '-s', default=False, action='store_true', help='Apply SAM')
+    parser.add_argument('--arc', default='AFER', help='Net name')
+    parser.add_argument('--input', default='', help='Input file')
+    parser.add_argument('--dataset', default='ABAW5', help='Output folder name')
+    parser.add_argument('--datadir', default='../../../Data/ABAW5/', help='Output folder name')
+    parser.add_argument('--sam', default=False, action='store_true', help='Apply SAM')
+    parser.add_argument('--config', default=0, type=int, help="config number")
     parser.add_argument('--epochs', default=20, type=int, help="number of epoch")
+    parser.add_argument('--batch', default=256, type=int, help="batch size")
+    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     args = parser.parse_args()
 
     resume = args.input
@@ -77,25 +75,22 @@ def main():
     net_name = args.arc
     epochs = args.epochs
 
-    output_dir = '{}_{}'.format(args.outdir, args.arc)
+    output_dir = '{}-{}-{}'.format(args.arc, args.dataset, args.config)
 
-    train_file = os.path.join(DATA_DIR, 'training.txt')
-    valid_file = os.path.join(DATA_DIR, 'validation.txt')
-
-
-    if net_name == 'AFER':
-        trainset = RawLSD(train_file, DATA_DIR + 'training')
-        validset = RawLSD(valid_file, DATA_DIR + 'validation')
+    if args.dataset == 'LSD':
+        train_file = os.path.join(args.datadir, 'training.txt')
+        valid_file = os.path.join(args.datadir, 'validation.txt')
+        trainset = LSD(train_file, args.datadir + 'training')
+        validset = LSD(valid_file, args.datadir + 'validation')
     else:
-        with open(os.path.join(DATA_DIR, 'lsd_train_enet_b0_8_best_vgaf.pickle'), 'rb') as handle:
-            train_feature=pickle.load(handle)
-        with open(os.path.join(DATA_DIR, 'lsd_valid_enet_b0_8_best_vgaf.pickle'), 'rb') as handle:
-            valid_feature=pickle.load(handle)
-        trainset = LSD(train_file, train_feature)
-        validset = LSD(valid_file, valid_feature)
+        train_annotation_path = args.datadir + 'annotations/EX/Train_Set/'
+        valid_annotation_path = args.datadir + 'annotations/EX/Validation_Set/'
+        image_path = args.datadir + 'cropped_aligned/batch1/cropped_aligned/'
+        trainset = ABAW5(train_annotation_path, image_path)
+        validset = ABAW5(valid_annotation_path, image_path)
 
-    trainldr = DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-    validldr = DataLoader(validset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    trainldr = DataLoader(trainset, batch_size=args.batch, shuffle=True, num_workers=0)
+    validldr = DataLoader(validset, batch_size=args.batch, shuffle=False, num_workers=0)
     trainexw = torch.from_numpy(trainset.ex_weight())
     validexw = torch.from_numpy(validset.ex_weight())
     trainexw = trainexw.float()
@@ -121,9 +116,9 @@ def main():
     valid_criteria = nn.CrossEntropyLoss(reduction='mean', weight=validexw, ignore_index=-1)
 
     if use_sam:
-        optimizer = SAM(net.parameters(), torch.optim.SGD, lr=learning_rate, momentum=0.9, weight_decay=1.0/batch_size)
+        optimizer = SAM(net.parameters(), torch.optim.SGD, lr=args.lr, momentum=0.9, weight_decay=1.0/args.batch)
     else:
-        optimizer = optim.AdamW(net.parameters(), betas=(0.9, 0.999), lr=learning_rate, weight_decay=1.0/batch_size)
+        optimizer = optim.AdamW(net.parameters(), betas=(0.9, 0.999), lr=args.lr, weight_decay=1.0/args.batch)
     best_performance = 0.0
     epoch_from_last_improvement = 0
 
@@ -136,7 +131,7 @@ def main():
 
     for epoch in range(start_epoch, epochs):
         lr = optimizer.param_groups[0]['lr']
-        train_loss = train(net, trainldr, optimizer, epoch, epochs, train_criteria)
+        train_loss = train(net, trainldr, optimizer, epoch, epochs, train_criteria, args.lr)
         val_loss, val_metrics = val(net, validldr, valid_criteria)
 
         infostr = {'Epoch {}: {:.5f},{:.5f},{:.5f},{:.5f}'
@@ -175,12 +170,6 @@ def main():
         df['train_loss'].append(train_loss),
         df['val_loss'].append(val_loss),
         df['val_metrics'].append(val_metrics)
-
-        if early_stop != None:
-            if epoch_from_last_improvement >= early_stop:
-                print('No improvement for ' + str(epoch_from_last_improvement) + ' epoches. Stop training')
-                break
-    
 
     df = pd.DataFrame(df)
     csv_name = os.path.join('results', output_dir, 'train.csv')
