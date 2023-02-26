@@ -1,90 +1,101 @@
 
-import torch
-from torchvision import transforms
-import numpy as np
 import os
-from tqdm.notebook import tqdm
-from PIL import Image
+import torch
 import pickle
+import argparse
+import numpy as np
+from PIL import Image
+from torchvision import transforms
+from tqdm import tqdm
 
-def get_probab(features, logits=True):
-    x=np.dot(features,np.transpose(classifier_weights))+classifier_bias
-    if logits:
-        return x
-    e_x = np.exp(x - np.max(x,axis=0))
-    return e_x / e_x.sum(axis=1)[:,None]
+def main():
+    DEVICE = 'cuda'
+    IMG_SIZE = 224
 
-print(f"Torch: {torch.__version__}")
-use_cuda = torch.cuda.is_available()
-print(use_cuda)
+    parser = argparse.ArgumentParser(description='Generate image feature')
+    parser.add_argument('--extractor', default='enet_b0_8_best_vgaf.pt', help='Extractor name')
+    parser.add_argument('--netdir', default='../MTL-ABAW4/model/', help='Extractor name')
+    parser.add_argument('--output', default='abaw5.pickle', help='Output file name')
+    parser.add_argument('--batch', type=int, default=64, help='Batch size')
+    parser.add_argument('--datadir', default='../../../Data/ABAW5/cropped_aligned/batch1/', help='Data folder path')
+    parser.add_argument('--augment', action='store_true', help='Augment data')
+    args = parser.parse_args()
+    netdir = args.netdir
+    data_dir = args.datadir
+    batch_size = args.batch
+    output_name = args.output
+    extractor_name = args.extractor
 
-DEVICE = 'cuda'
-PATH='enet_b0_8_best_vgaf.pt'
-#PATH='enet_b2_8.pt'
-IMG_SIZE=224
-DATA_DIR = '../../../Data/ABAW4/synthetic_challenge/'
-
-test_transforms = transforms.Compose(
-    [
-        transforms.Resize((IMG_SIZE,IMG_SIZE)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    ]
-)
-
-print(PATH)
-feature_extractor_model = torch.load('../MTL-ABAW3/model/'+ PATH)
-
-classifier_weights=feature_extractor_model.classifier[0].weight.cpu().data.numpy()
-classifier_bias=feature_extractor_model.classifier[0].bias.cpu().data.numpy()
-print(classifier_weights.shape,classifier_weights)
-print(classifier_bias.shape,classifier_bias)
-
-feature_extractor_model.classifier=torch.nn.Identity()
-feature_extractor_model=feature_extractor_model.to(DEVICE)
-feature_extractor_model.eval()
-
-
-print(test_transforms)
-data_dir=os.path.join(DATA_DIR,'validation')
-print(data_dir)
-img_names=[]
-X_global_features=[]
-imgs=[]
- 
-for img_name in os.listdir(data_dir):
-    if img_name.lower().endswith('.jpg'):
-        img = Image.open(os.path.join(data_dir,img_name))
-        img_tensor = test_transforms(img)
-        if img.size:
-            img_names.append(img_name)
-            imgs.append(img_tensor)
-            if len(imgs)>=96: #48: #96: #32:
-                features = feature_extractor_model(torch.stack(imgs, dim=0).to(DEVICE))
-                features=features.data.cpu().numpy()
-                
-                if len(X_global_features)==0:
-                    X_global_features=features
-                else:
-                    X_global_features=np.concatenate((X_global_features,features),axis=0)
-                imgs=[]
-
-if len(imgs)>0:        
-    features = feature_extractor_model(torch.stack(imgs, dim=0).to(DEVICE))
-    features = features.data.cpu().numpy()
-
-    if len(X_global_features)==0:
-        X_global_features=features
+    if args.augment:
+        transform = transforms.Compose(
+            [
+                transforms.Resize([int(IMG_SIZE * 1.02), int(IMG_SIZE * 1.02)]),
+                transforms.RandomCrop([IMG_SIZE, IMG_SIZE]),
+                transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std =[0.229, 0.224, 0.225])
+            ]
+        )
     else:
-        X_global_features=np.concatenate((X_global_features,features),axis=0)
+        transform = transforms.Compose(
+            [
+                transforms.Resize((IMG_SIZE, IMG_SIZE)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                    std=[0.229, 0.224, 0.225])
+            ]
+        )
 
-    imgs=[]
+    model = torch.load(netdir + extractor_name)
+    classifier_bias = model.classifier[0].bias.cpu().data.numpy()
+    classifier_weights = model.classifier[0].weight.cpu().data.numpy()
 
-X_scores=get_probab(X_global_features)
+    model.classifier = torch.nn.Identity()
+    model = model.to(DEVICE)
+    model.eval()
+    image_dir = os.path.join(data_dir, 'cropped_aligned')
 
-filename2featuresAll={img_name:(global_features,scores) for img_name,global_features,scores in zip(img_names,X_global_features,X_scores)}
-print(len(filename2featuresAll))
+    imgs = []
+    img_names = []
+    X_global_features = []
 
-with open(os.path.join(DATA_DIR, 'lsd_valid_enet_b0_8_best_vgaf.pickle'), 'wb') as handle:
-    pickle.dump(filename2featuresAll, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    for filename in tqdm(os.listdir(image_dir)):
+        frames_dir = os.path.join(image_dir, filename)    
+        for img_name in os.listdir(frames_dir):
+            if img_name.lower().endswith('.jpg'):
+                img = Image.open(os.path.join(frames_dir, img_name))
+                img_tensor = transform(img)
+                if img.size:
+                    img_names.append(filename + '/' + img_name)
+                    imgs.append(img_tensor)
+                    if len(imgs) >= batch_size:
+                        features = model(torch.stack(imgs, dim=0).to(DEVICE))
+                        features = features.data.cpu().numpy()
+                        
+                        if len(X_global_features) == 0:
+                            X_global_features = features
+                        else:
+                            X_global_features = np.concatenate((X_global_features, features), axis=0)
+                        imgs = []
+
+    if len(imgs) > 0:        
+        features = model(torch.stack(imgs, dim=0).to(DEVICE))
+        features = features.data.cpu().numpy()
+
+        if len(X_global_features) == 0:
+            X_global_features = features
+        else:
+            X_global_features = np.concatenate((X_global_features, features), axis=0)
+
+        imgs = []
+
+    X_scores = np.dot(X_global_features, np.transpose(classifier_weights)) + classifier_bias
+    feature_dict = {img_name: (global_features,scores) for img_name, global_features, scores in zip(img_names, X_global_features, X_scores)}
+
+    with open(os.path.join(data_dir, output_name), 'wb') as handle:
+        pickle.dump(feature_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+if __name__=="__main__":
+    main()
