@@ -1,7 +1,7 @@
 import os
 import pickle
 import pandas as pd
-from dataset import LSD, ABAW5
+from dataset import LSD, FeatureLSD, ABAW5, FeatureABAW5
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from helpers import *
@@ -70,18 +70,30 @@ def main():
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     args = parser.parse_args()
 
-    resume = args.input
-    use_sam = args.sam
-    net_name = args.arc
-    epochs = args.epochs
-
     output_dir = '{}-{}-{}'.format(args.arc, args.dataset, args.config)
 
     if args.dataset == 'LSD':
-        train_file = os.path.join(args.datadir, 'training.txt')
-        valid_file = os.path.join(args.datadir, 'validation.txt')
-        trainset = LSD(train_file, args.datadir + 'training')
-        validset = LSD(valid_file, args.datadir + 'validation')
+        train_annotation_path = os.path.join(args.datadir, 'training.txt')
+        valid_annotation_path = os.path.join(args.datadir, 'validation.txt')
+        trainset = LSD(train_annotation_path, args.datadir + 'training')
+        validset = LSD(valid_annotation_path, args.datadir + 'validation')
+    elif args.dataset == 'FeatureLSD':
+        train_annotation_path = os.path.join(args.datadir, 'training.txt')
+        valid_annotation_path = os.path.join(args.datadir, 'validation.txt')
+        with open(os.path.join(args.datadir, 'lsd_train_enet_b0_8_best_vgaf.pickle'), 'rb') as handle:
+            train_feature = pickle.load(handle)
+        with open(os.path.join(args.datadir, 'lsd_valid_enet_b0_8_best_vgaf.pickle'), 'rb') as handle:
+            valid_feature = pickle.load(handle)
+        trainset = FeatureLSD(train_annotation_path, train_feature)
+        validset = FeatureLSD(valid_annotation_path, valid_feature)
+    elif args.dataset == 'FeatureABAW5':
+        train_annotation_path = args.datadir + 'annotations/EX/Train_Set/'
+        valid_annotation_path = args.datadir + 'annotations/EX/Validation_Set/'
+        with open(os.path.join(args.datadir, 'cropped_aligned/batch1/abaw5.pickle'), 'rb') as handle:
+            feature = pickle.load(handle)
+        image_path = args.datadir + 'cropped_aligned/batch1/cropped_aligned/'
+        trainset = FeatureABAW5(train_annotation_path, image_path, feature)
+        validset = FeatureABAW5(valid_annotation_path, image_path, feature)
     else:
         train_annotation_path = args.datadir + 'annotations/EX/Train_Set/'
         valid_annotation_path = args.datadir + 'annotations/EX/Validation_Set/'
@@ -97,16 +109,16 @@ def main():
     validexw = validexw.float()
 
     start_epoch = 0
-    if net_name == 'AFER':
+    if args.arc == 'AFER':
         net = AFER()
-    elif net_name == 'MLP':
+    elif args.arc == 'MLP':
         net = MLP()
     else:
         net = Dense(1288, 6, activation='softmax')
 
-    if resume != '':
-        print("Resume form | {} ]".format(resume))
-        net = load_state_dict(net, resume)
+    if args.input != '':
+        print("Resume form | {} ]".format(args.input))
+        net = load_state_dict(net, args.input)
 
     net = nn.DataParallel(net).cuda()
     trainexw = trainexw.cuda()
@@ -115,7 +127,7 @@ def main():
     train_criteria = nn.CrossEntropyLoss(reduction='mean', weight=trainexw, ignore_index=-1)
     valid_criteria = nn.CrossEntropyLoss(reduction='mean', weight=validexw, ignore_index=-1)
 
-    if use_sam:
+    if args.sam:
         optimizer = SAM(net.parameters(), torch.optim.SGD, lr=args.lr, momentum=0.9, weight_decay=1.0/args.batch)
     else:
         optimizer = optim.AdamW(net.parameters(), betas=(0.9, 0.999), lr=args.lr, weight_decay=1.0/args.batch)
@@ -129,9 +141,9 @@ def main():
     df['val_loss'] = []
     df['val_metrics'] = []
 
-    for epoch in range(start_epoch, epochs):
+    for epoch in range(start_epoch, args.epochs):
         lr = optimizer.param_groups[0]['lr']
-        train_loss = train(net, trainldr, optimizer, epoch, epochs, train_criteria, args.lr)
+        train_loss = train(net, trainldr, optimizer, epoch, args.epochs, train_criteria, args.lr)
         val_loss, val_metrics = val(net, validldr, valid_criteria)
 
         infostr = {'Epoch {}: {:.5f},{:.5f},{:.5f},{:.5f}'

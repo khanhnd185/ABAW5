@@ -99,9 +99,9 @@ class MLP(nn.Module):
     def __init__(self, num_class=8, feature_size=1288):
         super(MLP, self).__init__()
         self.model = nn.Sequential(
-            Dense(feature_size, 640, activation='relu', drop=0.2),
-            Dense(640, 80, activation='relu', drop=0.2),
-            Dense(80, num_class, activation='softmax'),
+            Dense(feature_size, 512, activation='relu', drop=0.2),
+            Dense(512, 64, activation='relu', drop=0.2),
+            Dense(64, num_class, activation='softmax'),
         )
 
     def forward(self, x):
