@@ -94,6 +94,7 @@ class FeatureLSD(Dataset):
 
     def __getitem__(self, i):
         return self.X[i] , self.y[i]
+
     def __len__(self):
         return len(self.X)
 
@@ -145,9 +146,7 @@ class FeatureABAW5(Dataset):
             ]
         )
     def __getitem__(self, i):
-        img = pil_loader(os.path.join(self.img_path, self.X[i]))
-        img = self.transform(img)
-        return img, self.y[i]
+        return self.X[i] , self.y[i]
 
     def __len__(self):
         return len(self.X)
