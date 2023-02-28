@@ -86,12 +86,12 @@ class LSTM(nn.Module):
         self.head = nn.Sequential(
             Dense(feature_size, 512, activation='relu', drop=0.2),
             Dense(512, 64, activation='relu', drop=0.2),
-            Dense(64, num_class, activation='softmax'),
+            Dense(64, num_class),
         )
 
     def forward(self, x):
         self.rnn.flatten_parameters()
         output, _ = self.rnn(x)
-        output = self.head(output)
+        output = self.head(output).permute(0, 2, 1)
 
         return output

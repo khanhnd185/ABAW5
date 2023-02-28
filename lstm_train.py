@@ -21,8 +21,6 @@ def train(net, trainldr, optimizer, epoch, epochs, criteria, lr):
         y = y.cuda()
         optimizer.zero_grad()
         yhat = net(inputs)
-        y = torch.flatten(y, start_dim=0, end_dim=1)
-        yhat = torch.flatten(yhat, start_dim=0, end_dim=1)
         loss = criteria(yhat, y)
         loss.backward()
         optimizer.step()
@@ -30,8 +28,7 @@ def train(net, trainldr, optimizer, epoch, epochs, criteria, lr):
     return total_losses.avg()
 
 
-def val(net, validldr, criteria):
-    total_losses = AverageMeter()
+def val(net, validldr):
     net.eval()
     all_y = None
     all_yhat = None
@@ -43,8 +40,6 @@ def val(net, validldr, criteria):
             yhat = net(inputs)
             y = torch.flatten(y, start_dim=0, end_dim=1)
             yhat = torch.flatten(yhat, start_dim=0, end_dim=1)
-            loss = criteria(yhat, y)
-            total_losses.update(loss.data.item(), inputs.size(0))
 
             if all_y == None:
                 all_y = y.clone()
@@ -55,7 +50,7 @@ def val(net, validldr, criteria):
     all_y = all_y.cpu().numpy()
     all_yhat = all_yhat.cpu().numpy()
     metrics = EX_metric(all_y, all_yhat)
-    return total_losses.avg(), metrics
+    return metrics
 
 
 def main():
@@ -126,13 +121,13 @@ def main():
     for epoch in range(start_epoch, args.epochs):
         lr = optimizer.param_groups[0]['lr']
         train_loss = train(net, trainldr, optimizer, epoch, args.epochs, train_criteria, args.lr)
-        val_loss, val_metrics = val(net, validldr, valid_criteria)
+        val_metrics = val(net, validldr)
 
         infostr = {'Epoch {}: {:.5f},{:.5f},{:.5f},{:.5f}'
                 .format(epoch,
                         lr,
                         train_loss,
-                        val_loss,
+                        0,
                         val_metrics)}
         print(infostr)
 
@@ -141,7 +136,7 @@ def main():
         if val_metrics >= best_performance:
             checkpoint = {
                 'epoch': epoch,
-                'val_loss': val_loss,
+                'val_loss': 0,
                 'val_metrics': val_metrics,
                 'state_dict': net.state_dict(),
                 'optimizer': optimizer.state_dict(),
@@ -162,7 +157,7 @@ def main():
         df['epoch'].append(epoch),
         df['lr'].append(lr),
         df['train_loss'].append(train_loss),
-        df['val_loss'].append(val_loss),
+        df['val_loss'].append(0),
         df['val_metrics'].append(val_metrics)
 
     df = pd.DataFrame(df)
