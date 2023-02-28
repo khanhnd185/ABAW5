@@ -93,8 +93,8 @@ def main():
         trainset = SequenceFeatureABAW5(train_annotation_path, image_path, feature, True)
         validset = SequenceFeatureABAW5(valid_annotation_path, image_path, feature, False)
 
-    trainldr = DataLoader(trainset, weight=trainexw, batch_size=args.batch, shuffle=True, num_workers=0)
-    validldr = DataLoader(validset, weight=trainexw, batch_size=1, shuffle=False, num_workers=0)
+    trainldr = DataLoader(trainset, batch_size=args.batch, shuffle=True, num_workers=0)
+    validldr = DataLoader(validset, batch_size=1, shuffle=False, num_workers=0)
 
     start_epoch = 0
     if args.arc == 'lstm':
@@ -106,8 +106,8 @@ def main():
 
     net = nn.DataParallel(net).cuda()
 
-    train_criteria = nn.CrossEntropyLoss(reduction='mean', ignore_index=-1)
-    valid_criteria = nn.CrossEntropyLoss(reduction='mean', ignore_index=-1)
+    train_criteria = nn.CrossEntropyLoss(reduction='mean', weight=trainexw, ignore_index=-1)
+    valid_criteria = nn.CrossEntropyLoss(reduction='mean', weight=validexw, ignore_index=-1)
 
     if args.sam:
         optimizer = SAM(net.parameters(), torch.optim.SGD, lr=args.lr, momentum=0.9, weight_decay=1.0/args.batch)
