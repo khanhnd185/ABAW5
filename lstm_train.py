@@ -5,7 +5,7 @@ import pandas as pd
 import torch.optim as optim
 from sam import SAM
 from tqdm import tqdm
-from lstm import SequenceFeatureABAW5, LSTM
+from lstm import SequenceFeatureABAW5, LSTM, CombineDataset
 from dataset import FeatureABAW5
 from transformer import Transformer
 from torch.utils.data import DataLoader
@@ -71,7 +71,29 @@ def main():
 
     output_dir = '{}-{}-{}'.format(args.arc, args.dataset, args.config)
 
-    if args.dataset == 'SequenceFeatureABAW5':
+    if args.dataset == 'CombineDataset':
+        train_annotation_path = args.datadir + 'annotations/EX/Train_Set/'
+        valid_annotation_path = args.datadir + 'annotations/EX/Validation_Set/'
+        path_lsd_t = '../../../Data/ABAW4/synthetic_challenge/training.txt'
+        path_lsd_v = '../../../Data/ABAW4/synthetic_challenge/validation.txt'
+        train_annotation_path = (train_annotation_path, path_lsd_t, path_lsd_v)
+
+        with open(os.path.join(args.datadir, 'cropped_aligned/batch1/abaw5.pickle'), 'rb') as handle:
+            abaw5_feature = pickle.load(handle)
+        with open(os.path.join(args.datadir, '../ABAW4/synthetic_challenge/lsd_train_enet_b0_8_best_vgaf.pickle'), 'rb') as handle:
+            lsd_t_feature = pickle.load(handle)
+        with open(os.path.join(args.datadir, '../ABAW4/synthetic_challenge/lsd_valid_enet_b0_8_best_vgaf.pickle'), 'rb') as handle:
+            lsd_v_feature = pickle.load(handle)
+        feature_set = (abaw5_feature, lsd_t_feature, lsd_v_feature)
+
+        image_path = args.datadir + 'cropped_aligned/batch1/cropped_aligned/'
+        trainset = CombineDataset(train_annotation_path, image_path, feature_set, args.length)
+        validset = SequenceFeatureABAW5(valid_annotation_path, image_path, abaw5_feature, args.length, False)
+        
+        trainexw = torch.from_numpy(trainset.ex_weight())
+        trainexw = trainexw.float()
+        trainexw = trainexw.cuda()
+    else: 
         train_annotation_path = args.datadir + 'annotations/EX/Train_Set/'
         valid_annotation_path = args.datadir + 'annotations/EX/Validation_Set/'
         with open(os.path.join(args.datadir, 'cropped_aligned/batch1/abaw5.pickle'), 'rb') as handle:
@@ -81,11 +103,8 @@ def main():
         trainset = FeatureABAW5(train_annotation_path, image_path, feature)
         validset = FeatureABAW5(valid_annotation_path, image_path, feature)
         trainexw = torch.from_numpy(trainset.ex_weight())
-        validexw = torch.from_numpy(validset.ex_weight())
         trainexw = trainexw.float()
-        validexw = validexw.float()
         trainexw = trainexw.cuda()
-        validexw = validexw.cuda()
 
         trainset = SequenceFeatureABAW5(train_annotation_path, image_path, feature, args.length, True)
         validset = SequenceFeatureABAW5(valid_annotation_path, image_path, feature, args.length, False)
@@ -116,7 +135,6 @@ def main():
     df['epoch'] = []
     df['lr'] = []
     df['train_loss'] = []
-    df['val_loss'] = []
     df['val_metrics'] = []
 
     for epoch in range(start_epoch, args.epochs):
