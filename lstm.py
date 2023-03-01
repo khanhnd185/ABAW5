@@ -92,6 +92,6 @@ class LSTM(nn.Module):
     def forward(self, x):
         self.rnn.flatten_parameters()
         output, _ = self.rnn(x)
-        output = self.head(output).permute(0, 2, 1)
+        output = self.head(output)
 
         return output

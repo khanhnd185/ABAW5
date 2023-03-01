@@ -22,7 +22,7 @@ def train(net, trainldr, optimizer, epoch, epochs, criteria, lr):
         y = y.cuda()
         optimizer.zero_grad()
         yhat = net(inputs)
-        loss = criteria(yhat, y)
+        loss = criteria(yhat.permute(0, 2, 1), y)
         loss.backward()
         optimizer.step()
         total_losses.update(loss.data.item(), inputs.size(0))
@@ -57,7 +57,7 @@ def val(net, validldr):
 def main():
     parser = argparse.ArgumentParser(description='Train Emotion')
 
-    parser.add_argument('--arc', default='lstm', help='Net name')
+    parser.add_argument('--arc', default='transformer', help='Net name')
     parser.add_argument('--input', default='', help='Input file')
     parser.add_argument('--dataset', default='SequenceFeatureABAW5', help='Output folder name')
     parser.add_argument('--datadir', default='../../../Data/ABAW5/', help='Output folder name')
