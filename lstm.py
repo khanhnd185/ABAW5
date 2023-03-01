@@ -61,9 +61,9 @@ def get_temporal_abaw5_dataset(annotation_path, img_path, feature_dict, max_leng
     return X, Y
 
 class SequenceFeatureABAW5(Dataset):
-    def __init__(self, annoation_path, img_path, feature_dict, train):
+    def __init__(self, annoation_path, img_path, feature_dict, max_length, train):
         super(SequenceFeatureABAW5, self).__init__()
-        self.X , self.y = get_temporal_abaw5_dataset(annoation_path, img_path, feature_dict, 64, train)
+        self.X , self.y = get_temporal_abaw5_dataset(annoation_path, img_path, feature_dict, max_length, train)
         self.img_path = img_path
         self.transform = transforms.Compose(
             [

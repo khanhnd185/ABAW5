@@ -59,13 +59,14 @@ def main():
 
     parser.add_argument('--arc', default='transformer', help='Net name')
     parser.add_argument('--input', default='', help='Input file')
-    parser.add_argument('--dataset', default='SequenceFeatureABAW5', help='Output folder name')
-    parser.add_argument('--datadir', default='../../../Data/ABAW5/', help='Output folder name')
+    parser.add_argument('--dataset', default='SequenceFeatureABAW5', help='Dataset name')
+    parser.add_argument('--datadir', default='../../../Data/ABAW5/', help='Dataset folder')
     parser.add_argument('--sam', default=False, action='store_true', help='Apply SAM')
     parser.add_argument('--config', default=0, type=int, help="config number")
-    parser.add_argument('--epochs', default=10, type=int, help="number of epoch")
-    parser.add_argument('--batch', default=4, type=int, help="batch size")
-    parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
+    parser.add_argument('--epochs', default=20, type=int, help="number of epoch")
+    parser.add_argument('--batch', default=64, type=int, help="batch size")
+    parser.add_argument('--length', default=64, type=int, help="max sequence length")
+    parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
     args = parser.parse_args()
 
     output_dir = '{}-{}-{}'.format(args.arc, args.dataset, args.config)
@@ -86,8 +87,8 @@ def main():
         trainexw = trainexw.cuda()
         validexw = validexw.cuda()
 
-        trainset = SequenceFeatureABAW5(train_annotation_path, image_path, feature, True)
-        validset = SequenceFeatureABAW5(valid_annotation_path, image_path, feature, False)
+        trainset = SequenceFeatureABAW5(train_annotation_path, image_path, feature, args.length, True)
+        validset = SequenceFeatureABAW5(valid_annotation_path, image_path, feature, args.length, False)
 
     trainldr = DataLoader(trainset, batch_size=args.batch, shuffle=True, num_workers=0)
     validldr = DataLoader(validset, batch_size=1, shuffle=False, num_workers=0)
@@ -103,16 +104,13 @@ def main():
         net = load_state_dict(net, args.input)
 
     net = nn.DataParallel(net).cuda()
-
-    train_criteria = nn.CrossEntropyLoss(reduction='mean', weight=trainexw, ignore_index=-1)
-    valid_criteria = nn.CrossEntropyLoss(reduction='mean', weight=validexw, ignore_index=-1)
+    criteria = nn.CrossEntropyLoss(reduction='mean', weight=trainexw, ignore_index=-1)
 
     if args.sam:
         optimizer = SAM(net.parameters(), torch.optim.SGD, lr=args.lr, momentum=0.9, weight_decay=1.0/args.batch)
     else:
         optimizer = optim.AdamW(net.parameters(), betas=(0.9, 0.999), lr=args.lr, weight_decay=1.0/args.batch)
     best_performance = 0.0
-    epoch_from_last_improvement = 0
 
     df = {}
     df['epoch'] = []
@@ -123,44 +121,29 @@ def main():
 
     for epoch in range(start_epoch, args.epochs):
         lr = optimizer.param_groups[0]['lr']
-        train_loss = train(net, trainldr, optimizer, epoch, args.epochs, train_criteria, args.lr)
+        train_loss = train(net, trainldr, optimizer, epoch, args.epochs, criteria, args.lr)
         val_metrics = val(net, validldr)
 
-        infostr = {'Epoch {}: {:.5f},{:.5f},{:.5f},{:.5f}'
+        infostr = {'Epoch {}: {:.5f},{:.5f},{:.5f}'
                 .format(epoch,
                         lr,
                         train_loss,
-                        0,
                         val_metrics)}
         print(infostr)
 
         os.makedirs(os.path.join('results', output_dir), exist_ok = True)
 
         if val_metrics >= best_performance:
-            checkpoint = {
-                'epoch': epoch,
-                'val_loss': 0,
-                'val_metrics': val_metrics,
-                'state_dict': net.state_dict(),
-                'optimizer': optimizer.state_dict(),
-            }
+            checkpoint = {'state_dict': net.state_dict()}
             torch.save(checkpoint, os.path.join('results', output_dir, 'best_val_perform.pth'))
             best_performance = val_metrics
-            epoch_from_last_improvement = 0
-        else:
-            epoch_from_last_improvement += 1
 
-        checkpoint = {
-            'epoch': epoch,
-            'state_dict': net.state_dict(),
-            'optimizer': optimizer.state_dict(),
-        }
+        checkpoint = {'state_dict': net.state_dict()}
         torch.save(checkpoint, os.path.join('results', output_dir, 'cur_model.pth'))
 
         df['epoch'].append(epoch),
         df['lr'].append(lr),
         df['train_loss'].append(train_loss),
-        df['val_loss'].append(0),
         df['val_metrics'].append(val_metrics)
 
     df = pd.DataFrame(df)
