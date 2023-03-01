@@ -40,7 +40,7 @@ def val(net, validldr):
             y = y.cuda()
             yhat = net(inputs)
             y = y.squeeze(0)
-            yhat = yhat.permute(0, 2, 1).squeeze(0)
+            yhat = yhat.squeeze(0)
 
             if all_y == None:
                 all_y = y.clone()
