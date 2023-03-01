@@ -7,6 +7,7 @@ from sam import SAM
 from tqdm import tqdm
 from lstm import SequenceFeatureABAW5, LSTM
 from dataset import FeatureABAW5
+from transformer import Transformer
 from torch.utils.data import DataLoader
 from helpers import *
 
@@ -38,8 +39,8 @@ def val(net, validldr):
             inputs = inputs.cuda()
             y = y.cuda()
             yhat = net(inputs)
-            y = torch.flatten(y, start_dim=0, end_dim=1)
-            yhat = torch.flatten(yhat, start_dim=0, end_dim=1)
+            y = y.squeeze(0)
+            yhat = yhat.permute(0, 2, 1).squeeze(0)
 
             if all_y == None:
                 all_y = y.clone()
@@ -94,6 +95,8 @@ def main():
     start_epoch = 0
     if args.arc == 'lstm':
         net = LSTM()
+    elif args.arc == 'transformer':
+        net = Transformer(1288, 8, 512, 4, 512, 0.1, 4)
 
     if args.input != '':
         print("Resume form | {} ]".format(args.input))
