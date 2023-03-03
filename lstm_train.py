@@ -6,6 +6,7 @@ import torch.optim as optim
 from sam import SAM
 from tqdm import tqdm
 from lstm import SequenceFeatureABAW5, LSTM, CombineDataset
+from lion_pytorch import Lion
 from dataset import FeatureABAW5
 from transformer import Transformer
 from torch.utils.data import DataLoader
@@ -62,6 +63,7 @@ def main():
     parser.add_argument('--dataset', default='SequenceFeatureABAW5', help='Dataset name')
     parser.add_argument('--datadir', default='../../../Data/ABAW5/', help='Dataset folder')
     parser.add_argument('--sam', default=False, action='store_true', help='Apply SAM')
+    parser.add_argument('--lion', default=False, action='store_true', help='Lion optimizer')
     parser.add_argument('--config', default=0, type=int, help="config number")
     parser.add_argument('--epochs', default=20, type=int, help="number of epoch")
     parser.add_argument('--batch', default=64, type=int, help="batch size")
@@ -127,6 +129,8 @@ def main():
 
     if args.sam:
         optimizer = SAM(net.parameters(), torch.optim.SGD, lr=args.lr, momentum=0.9, weight_decay=1.0/args.batch)
+    elif args.lion:
+        optimizer = Lion(net.parameters(), lr=args.lr, weight_decay=10.0/args.batch)
     else:
         optimizer = optim.AdamW(net.parameters(), betas=(0.9, 0.999), lr=args.lr, weight_decay=1.0/args.batch)
     best_performance = 0.0
