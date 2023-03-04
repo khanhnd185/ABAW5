@@ -29,6 +29,19 @@ class Encoder(nn.Module):
             x = layer(x, mask)
         return self.norm(x)
 
+class Decoder(nn.Module):
+    "Generic N layer decoder with masking."
+    def __init__(self, size, h, feed_forward, dropout, N):
+        super(Decoder, self).__init__()
+        layer = DecoderLayer(size, h, feed_forward, dropout)
+        self.layers = clones(layer, N)
+        self.norm = LayerNorm(layer.size)
+
+    def forward(self, x, memory, src_mask=None, tgt_mask=None):
+        for layer in self.layers:
+            x = layer(x, memory, src_mask, tgt_mask)
+        return self.norm(x)
+
 class Transformer(nn.Module):
     def __init__(self, input, output, size, h, feed_forward, dropout, N):
         super(Transformer, self).__init__()
@@ -43,6 +56,28 @@ class Transformer(nn.Module):
     def forward(self, x):
         x = self.project(x)
         x = self.encoder(x)
+        x = self.head(x)
+        return x
+
+class TransformerFull(nn.Module):
+    def __init__(self, input, output, size, h, feed_forward, dropout, N):
+        super(TransformerFull, self).__init__()
+        self.project = get_projection(input, 512, 'minimal')
+        self.encoder = Encoder(size, h, feed_forward, dropout, N)
+        self.decoder = Decoder(size, h, feed_forward, dropout, N)
+        self.embeddings = nn.Parameter(torch.FloatTensor(torch.zeros(64, 512)))
+        self.head = nn.Sequential(
+            Dense(512, 256, activation='relu', drop=0.2),
+            Dense(256, 64, activation='relu', drop=0.2),
+            Dense(64, output),
+        )
+
+    def forward(self, x):
+        B, _, _ = x.shape
+        x = self.project(x)
+        x = self.encoder(x)
+        embeddings = self.embeddings.unsqueeze(0).repeat(B, 1, 1)
+        x = self.decoder(embeddings, x)
         x = self.head(x)
         return x
 
@@ -75,6 +110,31 @@ class EncoderLayer(nn.Module):
         x = x + self.drop1(self.self_attn(x1, x1, x1, mask))
         x2 = self.norm2(x)
         x = x + self.drop2(self.feed_forward(x2))
+        return x
+
+class DecoderLayer(nn.Module):
+    "Decoder is made of self-attn, src-attn, and feed forward (defined below)"
+    def __init__(self, size, h, feed_forward, dropout):
+        super(DecoderLayer, self).__init__()
+        self.size = size
+        self.self_attn = MultiHeadedAttention(h, size)
+        self.src_attn = MultiHeadedAttention(h, size)
+        self.feed_forward = PositionwiseFeedForward(size, feed_forward, dropout)
+        self.norm1 = LayerNorm(size)
+        self.norm2 = LayerNorm(size)
+        self.norm3 = LayerNorm(size)
+        self.drop1 = nn.Dropout(dropout)
+        self.drop2 = nn.Dropout(dropout)
+        self.drop3 = nn.Dropout(dropout)
+
+    def forward(self, x, memory, src_mask, tgt_mask):
+        m = memory
+        x1 = self.norm1(x)
+        x = x + self.drop1(self.self_attn(x1, x1, x1, tgt_mask))
+        x2 = self.norm2(x)
+        x = x + self.drop2(self.self_attn(x2, m, m, src_mask))
+        x3 = self.norm3(x)
+        x = x + self.drop3(self.feed_forward(x3))
         return x
 
 def attention(query, key, value, mask=None, dropout=None):
@@ -128,59 +188,3 @@ class PositionwiseFeedForward(nn.Module):
 
     def forward(self, x):
         return self.w_2(self.dropout(F.relu(self.w_1(x))))
-
-class Decoder(nn.Module):
-    def __init__(self, size, h, feed_forward, dropout):
-        super(Decoder, self).__init__()
-        self.size = size
-        self.audio_attn = MultiHeadedAttention(h, size)
-        self.video_attn = MultiHeadedAttention(h, size)
-        self.fused_attn = MultiHeadedAttention(h, size*2)
-        self.feed_forward = PositionwiseFeedForward(size*2, feed_forward, dropout)
-        self.norm1 = LayerNorm(size)
-        self.norm2 = LayerNorm(size)
-        self.norm3 = LayerNorm(size*2)
-        self.norm4 = LayerNorm(size*2)
-        self.drop1 = nn.Dropout(dropout)
-        self.drop2 = nn.Dropout(dropout)
-        self.drop3 = nn.Dropout(dropout)
-        self.drop4 = nn.Dropout(dropout)
- 
-    def forward(self, a, v, mask=None):
-        a1 = a + self.drop1(self.audio_attn(self.norm1(a), v, v, mask))
-        v1 = v + self.drop2(self.video_attn(self.norm2(v), a, a, mask))
-        f = torch.cat((a1, v1), dim=2)
-        f1 = self.norm3(f)
-        f = f + self.drop3(self.fused_attn(f1, f1, f1, mask))
-        f2 = self.norm4(f)
-        f = f + self.drop4(self.feed_forward(f2))
-        return f
-
-def test():
-    num_heads = 1
-    num_layers = 1
-    dim_ff = 1024
-    dropout = 0.2
-    dim_feature = 128
-
-    batch_size = 2
-    sequence_leng = 100
-
-    lengths = torch.tensor([100,50]).long()
-    mask = torch.arange(max(lengths))[None, :] < lengths[:, None]
-    mask = mask.long()
-
-    audio_encoder = Encoder(dim_feature, num_heads, dim_ff, dropout, num_layers)
-    video_encoder = Encoder(dim_feature, num_heads, dim_ff, dropout, num_layers)
-    fused_decoder = Decoder(dim_feature, num_heads, dim_ff, dropout)
-
-    a = torch.rand(batch_size, sequence_leng, dim_feature)
-    v = torch.rand(batch_size, sequence_leng, dim_feature)
-
-    a = audio_encoder(a, mask)
-    v = video_encoder(v, mask)
-    y = fused_decoder(a, v, mask)
-    print(y.shape)
-
-if __name__=="__main__":
-    test()

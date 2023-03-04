@@ -8,7 +8,7 @@ from tqdm import tqdm
 from lstm import SequenceFeatureABAW5, LSTM, CombineDataset
 from lion_pytorch import Lion
 from dataset import FeatureABAW5
-from transformer import Transformer
+from transformer import Transformer, TransformerFull
 from torch.utils.data import DataLoader
 from helpers import *
 
@@ -119,6 +119,8 @@ def main():
         net = LSTM()
     elif args.arc == 'transformer':
         net = Transformer(1288, 8, 512, 4, 512, 0.1, 4)
+    else:
+        net = TransformerFull(1288, 8, 512, 4, 512, 0.1, 4)
 
     if args.input != '':
         print("Resume form | {} ]".format(args.input))
