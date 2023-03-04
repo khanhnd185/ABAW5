@@ -59,28 +59,6 @@ class Transformer(nn.Module):
         x = self.head(x)
         return x
 
-class TransformerFull(nn.Module):
-    def __init__(self, input, output, size, h, feed_forward, dropout, N):
-        super(TransformerFull, self).__init__()
-        self.project = get_projection(input, 512, 'minimal')
-        self.encoder = Encoder(size, h, feed_forward, dropout, N)
-        self.decoder = Decoder(size, h, feed_forward, dropout, N)
-        self.embeddings = nn.Parameter(torch.FloatTensor(torch.zeros(64, 512)))
-        self.head = nn.Sequential(
-            Dense(512, 256, activation='relu', drop=0.2),
-            Dense(256, 64, activation='relu', drop=0.2),
-            Dense(64, output),
-        )
-
-    def forward(self, x):
-        B, _, _ = x.shape
-        x = self.project(x)
-        x = self.encoder(x)
-        embeddings = self.embeddings.unsqueeze(0).repeat(B, 1, 1)
-        x = self.decoder(embeddings, x)
-        x = self.head(x)
-        return x
-
 class LayerNorm(nn.Module):
     def __init__(self, features, eps=1e-6):
         super(LayerNorm, self).__init__()

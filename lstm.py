@@ -4,7 +4,6 @@ import numpy as np
 import torch.nn as nn
 from PIL import Image
 from block import Dense
-from torchvision import transforms
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 
@@ -93,15 +92,7 @@ class SequenceFeatureABAW5(Dataset):
     def __init__(self, annoation_path, img_path, feature_dict, max_length, train):
         super(SequenceFeatureABAW5, self).__init__()
         self.X , self.y = get_temporal_abaw5_dataset(annoation_path, img_path, feature_dict, max_length, train)
-        self.img_path = img_path
-        self.transform = transforms.Compose(
-            [
-                transforms.Resize((224,224)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                            std=[0.229, 0.224, 0.225])
-            ]
-        )
+
     def __getitem__(self, i):
         return self.X[i] , self.y[i]
 
@@ -136,14 +127,6 @@ class CombineDataset(Dataset):
         
         self.X = X_abaw5 + X_lsd_t + X_lsd_v
         self.Y = Y_abaw5 + Y_lsd_t + Y_lsd_v
-        self.transform = transforms.Compose(
-            [
-                transforms.Resize((224,224)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                            std=[0.229, 0.224, 0.225])
-            ]
-        )
     def __getitem__(self, i):
         return self.X[i] , self.Y[i]
 
