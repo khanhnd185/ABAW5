@@ -75,7 +75,7 @@ def main():
     parser.add_argument('--epochs', default=20, type=int, help="number of epoch")
     parser.add_argument('--batch', default=64, type=int, help="batch size")
     parser.add_argument('--length', default=64, type=int, help="max sequence length")
-    parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
+    parser.add_argument('--lr', type=float, default=0.0003, help='Learning rate')
     args = parser.parse_args()
 
     output_dir = 'frameformer-{}'.format(args.config)

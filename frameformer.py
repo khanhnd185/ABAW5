@@ -1,10 +1,9 @@
 import torch
 from block import Dense
 from torch.autograd import Variable
-import math, copy
+import copy
 from torch import nn as nn
 import numpy as np
-from torchvision import transforms
 from torch.utils.data import Dataset
 from lstm import get_temporal_abaw5_dataset, get_temporal_lsd_dataset
 from transformer import get_projection, PositionwiseFeedForward, attention
@@ -60,8 +59,6 @@ class LayerNorm(nn.Module):
         std = x.std(-1, keepdim=True)
         return self.a_2 * (x - mean) / (std + self.eps) + self.b_2
 
-
-
 class SublayerConnection(nn.Module):
     """
     A residual connection followed by a layer norm.
@@ -90,10 +87,10 @@ class EncoderLayer(nn.Module):
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
         return self.sublayer[1](x, self.feed_forward)
 
-class OriginEncoder(nn.Module):
+class Encoder(nn.Module):
     "Core encoder is a stack of N layers"
     def __init__(self, layer, N):
-        super(OriginEncoder, self).__init__()
+        super(Encoder, self).__init__()
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
         
@@ -120,10 +117,10 @@ class DecoderLayer(nn.Module):
         x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask))
         return self.sublayer[2](x, self.feed_forward)
 
-class OriginDecoder(nn.Module):
+class Decoder(nn.Module):
     "Generic N layer decoder with masking."
     def __init__(self, layer, N):
-        super(OriginDecoder, self).__init__()
+        super(Decoder, self).__init__()
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
         
@@ -142,14 +139,13 @@ class Frameformer(nn.Module):
     def __init__(self, input, output, size, h, feed_forward, dropout, N):
         super(Frameformer, self).__init__()
         c = copy.deepcopy
-        self.src_project = get_projection(input, 512, 'minimal')
-        self.tgt_project = get_projection(output, 512, 'minimal')
-        ff = PositionwiseFeedForward(512, feed_forward, dropout)
-        attn = MultiHeadedAttention(h, 512)
-        self.encoder = OriginEncoder(EncoderLayer(512, c(attn), c(ff), dropout), N)
-        self.decoder = OriginDecoder(DecoderLayer(512, c(attn), c(attn), 
-                             c(ff), dropout), N)
-        self.head = Dense(512, output)
+        self.src_project = get_projection(input, size, 'minimal')
+        self.tgt_project = get_projection(output, size, 'minimal')
+        ff = PositionwiseFeedForward(size, feed_forward, dropout)
+        attn = MultiHeadedAttention(h, size)
+        self.encoder = Encoder(EncoderLayer(size, c(attn), c(ff), dropout), N)
+        self.decoder = Decoder(DecoderLayer(size, c(attn), c(attn), c(ff), dropout), N)
+        self.head = Dense(size, output)
 
     def forward(self, src, tgt, src_mask, tgt_mask):
         memory = self.encode(src, src_mask)
@@ -234,17 +230,15 @@ class FrameABAW5(Dataset):
 class VFrameABAW5(Dataset):
     def __init__(self, annoation_paths, img_path, feature_dict, max_length):
         super(VFrameABAW5, self).__init__()
-        X_abaw5, Y_abaw5 = get_temporal_abaw5_dataset(annoation_paths, img_path, feature_dict, max_length, False)
+        X, Y = get_temporal_abaw5_dataset(annoation_paths, img_path, feature_dict, max_length, False)
 
         self.src = []
-        X = X_abaw5
         self.src_mask = [np.ones((x.shape[0]+1)) for x in X]
 
         for x in X:
             self.src.append(np.concatenate([np.zeros((1, 1288)), x], axis=0))
  
         self.tgt_y = []
-        Y = Y_abaw5
         self.weigth = self.ex_weight(Y)
 
         for y in Y:
