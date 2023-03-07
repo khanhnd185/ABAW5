@@ -7,6 +7,8 @@ import numpy as np
 from PIL import Image
 from torchvision import transforms
 from tqdm import tqdm
+from torchvision import models
+from torch import nn
 
 def main():
     DEVICE = 'cuda'
@@ -18,7 +20,9 @@ def main():
     parser.add_argument('--output', default='abaw5.pickle', help='Output file name')
     parser.add_argument('--batch', type=int, default=64, help='Batch size')
     parser.add_argument('--datadir', default='../../../Data/ABAW5/cropped_aligned/batch1/', help='Data folder path')
-    parser.add_argument('--augment', action='store_true', help='Augment data')
+    parser.add_argument('--augment', default=False, action='store_true', help='Augment data')
+    parser.add_argument('--score', default=False, action='store_true', help='Concatenate score')
+
     args = parser.parse_args()
     netdir = args.netdir
     data_dir = args.datadir
@@ -47,11 +51,23 @@ def main():
             ]
         )
 
-    model = torch.load(netdir + extractor_name)
-    classifier_bias = model.classifier[0].bias.cpu().data.numpy()
-    classifier_weights = model.classifier[0].weight.cpu().data.numpy()
+    if extractor_name == 'resnet18_msceleb.pth':
+        resnet = models.resnet18(True)
+        checkpoint = torch.load(netdir + extractor_name)
+        resnet.load_state_dict(checkpoint['state_dict'],strict=True)
+        model = nn.Sequential(*list(resnet.children())[:-2])
+    elif extractor_name == 'enet_b2_8.pt':
+        model = torch.load(netdir + extractor_name)
+        classifier_bias = model.classifier.bias.cpu().data.numpy()
+        classifier_weights = model.classifier.weight.cpu().data.numpy()
+        model.classifier = torch.nn.Identity()        
+    else:
+        model = torch.load(netdir + extractor_name)
+        classifier_bias = model.classifier[0].bias.cpu().data.numpy()
+        classifier_weights = model.classifier[0].weight.cpu().data.numpy()
+        model.classifier = torch.nn.Identity()
 
-    model.classifier = torch.nn.Identity()
+    model = nn.DataParallel(model)
     model = model.to(DEVICE)
     model.eval()
     image_dir = os.path.join(data_dir, 'cropped_aligned')
@@ -90,8 +106,11 @@ def main():
 
         imgs = []
 
-    X_scores = np.dot(X_global_features, np.transpose(classifier_weights)) + classifier_bias
-    feature_dict = {img_name: (global_features,scores) for img_name, global_features, scores in zip(img_names, X_global_features, X_scores)}
+    if args.score:
+        X_scores = np.dot(X_global_features, np.transpose(classifier_weights)) + classifier_bias
+        feature_dict = {img_name: (global_features,scores) for img_name, global_features, scores in zip(img_names, X_global_features, X_scores)}
+    else:
+        feature_dict = {img_name: global_features for img_name, global_features in zip(img_names, X_global_features)}
 
     with open(os.path.join(data_dir, output_name), 'wb') as handle:
         pickle.dump(feature_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
