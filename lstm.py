@@ -31,15 +31,28 @@ def get_temporal_abaw5_dataset(annotation_path, img_path, feature_dict, max_leng
         x, y, leng = [], [], 0
         for i, label in enumerate(lines):
             expression = int(label)
-            if expression < 0:
-                continue
+            if expression >= 0:
+                j = i
+                overflow = False
+                file_exist = False
+                while not file_exist:
+                    j = j + 1
+                    imagename = "{}/{:05d}.jpg".format(filename[:-4], j)
+                    imagepath = os.path.join(img_path, imagename)
+                    file_exist = os.path.isfile(imagepath)
+                    if j > len(lines):
+                        overflow = True
+                        break
 
-            imagename = "{}/{:05d}.jpg".format(filename[:-4], i+1)
-            imagepath = os.path.join(img_path, imagename)
-            if not os.path.isfile(imagepath):
-                continue
+                if overflow == True:
+                    j = i+1
+                    file_exist = False
+                    while not file_exist:
+                        j = j - 1
+                        imagename = "{}/{:05d}.jpg".format(filename[:-4], j)
+                        imagepath = os.path.join(img_path, imagename)
+                        file_exist = os.path.isfile(imagepath)
 
-            if imagename in feature_dict:
                 x.append(np.expand_dims(np.concatenate((feature_dict[imagename][0], feature_dict[imagename][1])), axis=0))
                 y.append(expression)
                 leng = leng + 1

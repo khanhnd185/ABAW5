@@ -64,10 +64,12 @@ def main():
     parser.add_argument('--datadir', default='../../../Data/ABAW5/', help='Dataset folder')
     parser.add_argument('--sam', default=False, action='store_true', help='Apply SAM')
     parser.add_argument('--lion', default=False, action='store_true', help='Lion optimizer')
-    parser.add_argument('--config', default=0, type=int, help="config number")
+    parser.add_argument('--config', default='0', help="config")
     parser.add_argument('--epochs', default=20, type=int, help="number of epoch")
     parser.add_argument('--batch', default=64, type=int, help="batch size")
     parser.add_argument('--length', default=64, type=int, help="max sequence length")
+    parser.add_argument('--head', default=4, type=int, help="Num of head")
+    parser.add_argument('--layer', default=4, type=int, help="Num of layer")
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
     args = parser.parse_args()
 
@@ -118,7 +120,7 @@ def main():
     if args.arc == 'lstm':
         net = LSTM()
     else:
-        net = Transformer(1288, 8, 512, 4, 512, 0.1, 4)
+        net = Transformer(1288, 8, 512, args.head, 512, 0.1, args.layer)
 
     if args.input != '':
         print("Resume form | {} ]".format(args.input))
