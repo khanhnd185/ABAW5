@@ -92,7 +92,7 @@ def main():
 
         image_path = args.datadir + 'cropped_aligned/batch1/cropped_aligned/'
         trainset = CombineDataset(train_annotation_path, image_path, feature_set, args.length)
-        validset = SequenceFeatureABAW5(valid_annotation_path, image_path, abaw5_feature, args.length, False)
+        validset = SequenceFeatureABAW5(valid_annotation_path, image_path, abaw5_feature, args.length, 'val')
         
         trainexw = torch.from_numpy(trainset.ex_weight())
         trainexw = trainexw.float()
@@ -110,8 +110,8 @@ def main():
         trainexw = trainexw.float()
         trainexw = trainexw.cuda()
 
-        trainset = SequenceFeatureABAW5(train_annotation_path, image_path, feature, args.length, True)
-        validset = SequenceFeatureABAW5(valid_annotation_path, image_path, feature, args.length, False)
+        trainset = SequenceFeatureABAW5(train_annotation_path, image_path, feature, args.length, 'train')
+        validset = SequenceFeatureABAW5(valid_annotation_path, image_path, feature, args.length, 'val')
 
     trainldr = DataLoader(trainset, batch_size=args.batch, shuffle=True, num_workers=0)
     validldr = DataLoader(validset, batch_size=1, shuffle=False, num_workers=0)

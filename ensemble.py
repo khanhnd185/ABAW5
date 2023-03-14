@@ -113,7 +113,7 @@ def main():
         abaw5_feature = pickle.load(handle)
 
     image_path = args.datadir + 'cropped_aligned/batch1/cropped_aligned/'
-    validset = SequenceFeatureABAW5(valid_annotation_path, image_path, abaw5_feature, args.length, False)
+    validset = SequenceFeatureABAW5(valid_annotation_path, image_path, abaw5_feature, args.length, 'val')
     validldr = DataLoader(validset, batch_size=1, shuffle=False, num_workers=0)
 
     net1 = Transformer(1288, 8, 512, 4, 512, 0.1, 4)

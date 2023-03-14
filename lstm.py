@@ -20,7 +20,7 @@ def pil_loader(path):
         with Image.open(f) as img:
             return img.convert('RGB')
 
-def get_temporal_abaw5_dataset(annotation_path, img_path, feature_dict, max_length, train):
+def get_temporal_abaw5_dataset(annotation_path, img_path, feature_dict, max_length, split):
     X, Y = [], []
     filenames = os.listdir(annotation_path)
 
@@ -57,15 +57,58 @@ def get_temporal_abaw5_dataset(annotation_path, img_path, feature_dict, max_leng
                 y.append(expression)
                 leng = leng + 1
 
-            if leng < max_length and (i == (len(lines) - 1)) and train:
+            if leng < max_length and (i == (len(lines) - 1)) and split == 'train':
                 overlap = leng - max_length
                 x = prev_x[overlap:] + x
                 y = prev_y[overlap:] + y
 
             if leng == max_length or (i == (len(lines) - 1)):
-                if train:
+                if split == 'train':
                     prev_x = x
                     prev_y = y
+                X.append(np.concatenate(x, axis=0))
+                Y.append(np.array(y))
+                x, y, leng = [], [], 0
+
+    return X, Y
+
+def get_temporal_test_abaw5_dataset(annotation_path, img_path, feature_dict, max_length):
+    X, Y = [], []
+    filenames = os.listdir(annotation_path)
+
+    for filename in filenames:
+        with open(annotation_path + filename) as f:
+            lines = f.read().splitlines()[1:]
+
+        x, y, leng = [], [], 0
+        for i, name in enumerate(lines):
+            j = i
+            overflow = False
+            file_exist = False
+            while not file_exist:
+                imagename = "{}/{}.jpg".format(filename[:-4], lines[j])
+                imagepath = os.path.join(img_path, imagename)
+                file_exist = os.path.isfile(imagepath)
+                j = j + 1
+                if j > len(lines):
+                    overflow = True
+                    break
+
+            if overflow == True:
+                j = i
+                file_exist = False
+                while not file_exist:
+                    j = j - 1
+                    imagename = "{}/{:05d}.jpg".format(filename[:-4], lines[j])
+                    imagepath = os.path.join(img_path, imagename)
+                    file_exist = os.path.isfile(imagepath)
+
+                x.append(np.expand_dims(np.concatenate((feature_dict[imagename][0], feature_dict[imagename][1])), axis=0))
+                y.append("{}/{}.jpg".format(filename[:-4], name))
+                leng = leng + 1
+
+
+            if leng == max_length or (i == (len(lines) - 1)):
                 X.append(np.concatenate(x, axis=0))
                 Y.append(np.array(y))
                 x, y, leng = [], [], 0
@@ -102,9 +145,12 @@ def get_temporal_lsd_dataset(annotation_path, feature_dict, max_length):
     return X, Y
 
 class SequenceFeatureABAW5(Dataset):
-    def __init__(self, annoation_path, img_path, feature_dict, max_length, train):
+    def __init__(self, annoation_path, img_path, feature_dict, max_length, split='train'):
         super(SequenceFeatureABAW5, self).__init__()
-        self.X , self.y = get_temporal_abaw5_dataset(annoation_path, img_path, feature_dict, max_length, train)
+        if split == 'test':
+            self.X , self.y = get_temporal_test_abaw5_dataset(annoation_path, img_path, feature_dict, max_length)
+        else:
+            self.X , self.y = get_temporal_abaw5_dataset(annoation_path, img_path, feature_dict, max_length, split)
 
     def __getitem__(self, i):
         return self.X[i] , self.y[i]
