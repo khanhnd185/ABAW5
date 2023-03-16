@@ -11,27 +11,24 @@ def test(net1, net2, net3, validldr):
     net1.eval()
     net2.eval()
     net3.eval()
-    all_y = None
+    all_y = []
     all_yhat = None
     for batch_idx, (inputs, y) in enumerate(tqdm(validldr)):
         with torch.no_grad():
-            y = y.long()
             inputs = inputs.cuda()
-            y = y.cuda()
             yhat1 = net1(inputs)
             yhat2 = net2(inputs)
             yhat3 = net3(inputs)
             yhat = (yhat1 + yhat2 + yhat3) / 3
-            y = y.squeeze(0)
             yhat = yhat.squeeze(0)
+            y = [i[0] for i in y]
 
-            if all_y == None:
-                all_y = y.clone()
+            if all_yhat == None:
+                all_y = y.copy()
                 all_yhat = yhat.clone()
             else:
-                all_y = torch.cat((all_y, y), 0)
+                all_y = all_y + y
                 all_yhat = torch.cat((all_yhat, yhat), 0)
-    all_y = all_y.cpu().numpy()
     all_yhat = all_yhat.cpu().numpy()
     return all_y, all_yhat
 
@@ -57,10 +54,10 @@ def main():
 
     valid_annotation_path = args.datadir + 'testset/framelist/'
 
-    with open(os.path.join(args.datadir, 'cropped_aligned/batch1/test_abaw5.pickle'), 'rb') as handle:
+    with open(os.path.join(args.datadir, 'cropped_aligned/batch1/abaw5.pickle'), 'rb') as handle:
         abaw5_feature = pickle.load(handle)
 
-    image_path = args.datadir + 'testset/batch1/cropped_aligned/'
+    image_path = args.datadir + 'cropped_aligned/batch1/cropped_aligned/'
     validset = SequenceFeatureABAW5(valid_annotation_path, image_path, abaw5_feature, args.length, 'test')
     validldr = DataLoader(validset, batch_size=1, shuffle=False, num_workers=0)
 

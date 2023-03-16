@@ -86,31 +86,31 @@ def get_temporal_test_abaw5_dataset(annotation_path, img_path, feature_dict, max
             overflow = False
             file_exist = False
             while not file_exist:
+                if j == len(lines):
+                    overflow = True
+                    break
                 imagename = "{}/{}.jpg".format(filename[:-4], lines[j])
                 imagepath = os.path.join(img_path, imagename)
                 file_exist = os.path.isfile(imagepath)
                 j = j + 1
-                if j > len(lines):
-                    overflow = True
-                    break
 
             if overflow == True:
                 j = i
                 file_exist = False
                 while not file_exist:
                     j = j - 1
-                    imagename = "{}/{:05d}.jpg".format(filename[:-4], lines[j])
+                    imagename = "{}/{}.jpg".format(filename[:-4], lines[j])
                     imagepath = os.path.join(img_path, imagename)
                     file_exist = os.path.isfile(imagepath)
 
-                x.append(np.expand_dims(np.concatenate((feature_dict[imagename][0], feature_dict[imagename][1])), axis=0))
-                y.append("{}/{}.jpg".format(filename[:-4], name))
-                leng = leng + 1
+            x.append(np.expand_dims(np.concatenate((feature_dict[imagename][0], feature_dict[imagename][1])), axis=0))
+            y.append("{}/{}.jpg".format(filename[:-4], name))
+            leng = leng + 1
 
 
             if leng == max_length or (i == (len(lines) - 1)):
                 X.append(np.concatenate(x, axis=0))
-                Y.append(np.array(y))
+                Y.append(y)
                 x, y, leng = [], [], 0
 
     return X, Y
