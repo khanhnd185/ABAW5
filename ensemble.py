@@ -39,65 +39,6 @@ def val(net1, net2, net3, validldr):
     metrics = ex_metric(all_y, all_yhat)
     return metrics
 
-def vote(net1, net2, net3, validldr):
-    weight = [ 1.2737,  6.2880,  8.5886, 10.9778,  1.3193,  1.0000,  4.7732,  1.3422]
-    net1.eval()
-    net2.eval()
-    net3.eval()
-    all_y = None
-    all_yhat1 = None
-    all_yhat2 = None
-    all_yhat3 = None
-    for batch_idx, (inputs, y) in enumerate(tqdm(validldr)):
-        with torch.no_grad():
-            y = y.long()
-            inputs = inputs.cuda()
-            y = y.cuda()
-            yhat1 = net1(inputs)
-            yhat2 = net2(inputs)
-            yhat3 = net3(inputs)
-            y = y.squeeze(0)
-            yhat1 = yhat1.squeeze(0)
-            yhat2 = yhat2.squeeze(0)
-            yhat3 = yhat3.squeeze(0)
-
-            if all_y == None:
-                all_y = y.clone()
-                all_yhat1 = yhat1.clone()
-                all_yhat2 = yhat2.clone()
-                all_yhat3 = yhat3.clone()
-            else:
-                all_y = torch.cat((all_y, y), 0)
-                all_yhat1 = torch.cat((all_yhat1, yhat1), 0)
-                all_yhat2 = torch.cat((all_yhat2, yhat2), 0)
-                all_yhat3 = torch.cat((all_yhat3, yhat3), 0)
-
-    all_y = all_y.cpu().numpy()
-    all_yhat = []
-    for i in tqdm(range(all_y.shape[0])):
-        
-        _, vote = torch.max(all_yhat1[i], dim=-1)
-        vote_weight = weight[vote]
-
-        _, vote2 = torch.max(all_yhat2[i], dim=-1)
-        if vote_weight < weight[vote2]:
-            vote_weight = weight[vote2]
-            vote = vote2
-
-        _, vote3 = torch.max(all_yhat3[i], dim=-1)
-        if vote_weight < weight[vote3]:
-            vote_weight = weight[vote3]
-            vote = vote3
-
-        onehot = [0,0,0,0,0,0,0,0]
-        onehot[vote] = 1
-        all_yhat.append(onehot)
-        
-    all_yhat = np.array(all_yhat)
-    metrics = ex_metric(all_y, all_yhat)
-    return metrics
-
-
 def main():
     parser = argparse.ArgumentParser(description='Train Emotion')
 
