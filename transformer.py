@@ -43,7 +43,7 @@ class Decoder(nn.Module):
         return self.norm(x)
 
 class Transformer(nn.Module):
-    def __init__(self, input, output, size, h, feed_forward, dropout, N):
+    def __init__(self, input, output, size, h, feed_forward, dropout, N, loss='ce'):
         super(Transformer, self).__init__()
         self.project = get_projection(input, 512, 'minimal')
         self.encoder = Encoder(size, h, feed_forward, dropout, N)
@@ -52,11 +52,20 @@ class Transformer(nn.Module):
             Dense(256, 64, activation='relu', drop=0.2),
             Dense(64, output),
         )
+
+        if loss == 'ccc':
+            self.bn = nn.BatchNorm1d(output)
+            self.bn.weight.data.fill_(1)
+            self.bn.bias.data.zero_()
+        else:
+            self.bn = nn.Identity()
         
     def forward(self, x):
         x = self.project(x)
         x = self.encoder(x)
         x = self.head(x)
+        x = self.bn(torch.transpose(x, 1, 2))
+        x = torch.transpose(x, 1, 2)
         return x
 
 class LayerNorm(nn.Module):

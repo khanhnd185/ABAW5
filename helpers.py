@@ -81,3 +81,45 @@ def EX_metric(y, yhat):
             yhat = np.argmax(yhat, axis=-1)
 
     return f1_score(y, yhat, average='macro')
+
+def CCC_score(x, y):
+    vx = x - np.mean(x)
+    vy = y - np.mean(y)
+    rho = np.sum(vx * vy) / (np.sqrt(np.sum(vx**2)) * np.sqrt(np.sum(vy**2)))
+    x_m = np.mean(x)
+    y_m = np.mean(y)
+    x_s = np.std(x)
+    y_s = np.std(y)
+    ccc = 2*rho*x_s*y_s/(x_s**2 + y_s**2 + (x_m - y_m)**2)
+    return ccc
+
+def va_metric(y, yhat):
+    cccs = (float(CCC_score(y[:,0], yhat[:,0])), float(CCC_score(y[:,1], yhat[:,1])))
+    avg_ccc = float(CCC_score(y[:,0], yhat[:,0]) + CCC_score(y[:,1], yhat[:,1])) / 2
+    return avg_ccc, cccs
+
+class RegressionLoss(nn.Module):
+    def __init__(self):
+        super(RegressionLoss, self).__init__() 
+        self.loss = MaskNegativeCCCLoss()
+
+    def forward(self, x, y, mask):
+        loss1 = self.loss(x[:, 0], y[:, 0], mask) + self.loss(x[:, 1], y[:, 1], mask)
+        return loss1
+
+class MaskNegativeCCCLoss(nn.Module):
+    def __init__(self):
+        super(MaskNegativeCCCLoss, self).__init__()
+    def forward(self, x, y, m):
+        y = y.view(-1)
+        x = x.view(-1)
+        x = x * m
+        y = y * m
+        N = torch.sum(m)
+        x_m = torch.sum(x) / N
+        y_m = torch.sum(y) / N
+        vx = (x - x_m) * m
+        vy = (y - y_m) * m
+        ccc = 2*torch.dot(vx, vy) / (torch.dot(vx, vx) + torch.dot(vy, vy) + N * torch.pow(x_m - y_m, 2) + EPS)
+        return 1-ccc
+
