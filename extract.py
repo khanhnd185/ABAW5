@@ -15,11 +15,11 @@ def main():
 
     parser = argparse.ArgumentParser(description='Generate image feature')
     parser.add_argument('--extractor', default='enet_b0_8_best_vgaf.pt', help='Extractor name')
-    parser.add_argument('--args.netdir', default='../MTL-ABAW4/model/', help='Extractor name')
+    parser.add_argument('--netdir', default='archive/models/', help='Extractor name')
     parser.add_argument('--output', default='abaw5.pickle', help='Output file name')
     parser.add_argument('--batch', type=int, default=64, help='Batch size')
-    parser.add_argument('--datadir', default='../../../Data/ABAW5/cropped_aligned/batch1/', help='Data folder path')
-    parser.add_argument('--score', default=False, action='store_true', help='Concatenate score')
+    parser.add_argument('--datadir', default='archive/dataset/affwild2/cropped_aligned/batch1/', help='Data folder path')
+    parser.add_argument('--score', default=True, action='store_true', help='Concatenate score')
 
     args = parser.parse_args()
     transform = transforms.Compose(

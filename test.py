@@ -6,7 +6,7 @@ from torch import nn as nn
 from dataset import SequenceFeatureABAW5
 from transformer import Transformer
 from torch.utils.data import DataLoader
-from helpers import *
+from utils import *
 
 def test(net1, net2, net3, validldr):
     net1.eval()
@@ -45,11 +45,11 @@ def generate_output(filename, imagenames, predictions):
 def main():
     parser = argparse.ArgumentParser(description='Train Emotion')
 
-    parser.add_argument('--net1', default='transformer-CombineDataset-83dd7186', help='Net name')
-    parser.add_argument('--net2', default='transformer-CombineDataset-83dd7186-h8', help='Net name')
-    parser.add_argument('--net3', default='transformer-CombineDataset-83dd7186-N6', help='Net name')
+    parser.add_argument('--net1', default='83dd7186.pth', help='Net name')
+    parser.add_argument('--net2', default='83dd7186-h8.pth', help='Net name')
+    parser.add_argument('--net3', default='83dd7186-N6.pth', help='Net name')
     parser.add_argument('--output', default='predictions', help='Output name')
-    parser.add_argument('--datadir', default='../../../Data/ABAW5/', help='Dataset folder')
+    parser.add_argument('--datadir', default='archive/dataset/affwild2/', help='Dataset folder')
     parser.add_argument('--length', default=64, type=int, help="max sequence length")
     args = parser.parse_args()
 
@@ -66,9 +66,9 @@ def main():
     net2 = Transformer(1288, 8, 512, 8, 512, 0.1, 4)
     net3 = Transformer(1288, 8, 512, 4, 512, 0.1, 6)
 
-    net1 = load_state_dict(net1, 'results/' + args.net1 + '/best_val_perform.pth')
-    net2 = load_state_dict(net2, 'results/' + args.net2 + '/best_val_perform.pth')
-    net3 = load_state_dict(net3, 'results/' + args.net3 + '/best_val_perform.pth')
+    net1 = load_state_dict(net1, 'archive/models/' + args.net1)
+    net2 = load_state_dict(net2, 'archive/models/' + args.net2)
+    net3 = load_state_dict(net3, 'archive/models/' + args.net3)
 
     net1 = nn.DataParallel(net1).cuda()
     net2 = nn.DataParallel(net2).cuda()

@@ -8,7 +8,7 @@ from torch import nn as nn
 from dataset import SequenceFeatureABAW5, CombineDataset
 from transformer import Transformer
 from torch.utils.data import DataLoader
-from helpers import *
+from utils import *
 
 def train(net, trainldr, optimizer, epoch, epochs, criteria, lr):
     total_losses = AverageMeter()
@@ -57,7 +57,7 @@ def main():
     parser = argparse.ArgumentParser(description='Train Emotion')
 
     parser.add_argument('--input', default='', help='Input file')
-    parser.add_argument('--datadir', default='../../../Data/ABAW5/', help='Dataset folder')
+    parser.add_argument('--datadir', default='archive/dataset/', help='Dataset folder')
     parser.add_argument('--name', default='0', help="output dir name")
     parser.add_argument('--epochs', default=20, type=int, help="number of epoch")
     parser.add_argument('--batch', default=64, type=int, help="batch size")
@@ -69,21 +69,21 @@ def main():
 
     output_dir = '{}'.format(args.name)
 
-    train_annotation_path = args.datadir + 'annotations/EX/Train_Set/'
-    valid_annotation_path = args.datadir + 'annotations/EX/Validation_Set/'
-    path_lsd_t = '../../../Data/ABAW4/synthetic_challenge/training.txt'
-    path_lsd_v = '../../../Data/ABAW4/synthetic_challenge/validation.txt'
+    train_annotation_path = args.datadir + 'affwild2/annotations/EX/Train_Set/'
+    valid_annotation_path = args.datadir + 'affwild2/annotations/EX/Validation_Set/'
+    path_lsd_t = args.datadir + 'lsd/training.txt'
+    path_lsd_v = args.datadir + 'lsd/validation.txt'
     train_annotation_path = (train_annotation_path, path_lsd_t, path_lsd_v)
 
-    with open(os.path.join(args.datadir, 'cropped_aligned/batch1/abaw5.pickle'), 'rb') as handle:
+    with open(os.path.join(args.datadir, 'affwild2/cropped_aligned/batch1/abaw5.pickle'), 'rb') as handle:
         abaw5_feature = pickle.load(handle)
-    with open(os.path.join(args.datadir, '../ABAW4/synthetic_challenge/lsd_train_enet_b0_8_best_vgaf.pickle'), 'rb') as handle:
+    with open(os.path.join(args.datadir, 'lsd/lsd_train_enet_b0_8_best_vgaf.pickle'), 'rb') as handle:
         lsd_t_feature = pickle.load(handle)
-    with open(os.path.join(args.datadir, '../ABAW4/synthetic_challenge/lsd_valid_enet_b0_8_best_vgaf.pickle'), 'rb') as handle:
+    with open(os.path.join(args.datadir, 'lsd/lsd_valid_enet_b0_8_best_vgaf.pickle'), 'rb') as handle:
         lsd_v_feature = pickle.load(handle)
     feature_set = (abaw5_feature, lsd_t_feature, lsd_v_feature)
 
-    image_path = args.datadir + 'cropped_aligned/batch1/cropped_aligned/'
+    image_path = args.datadir + 'affwild2/cropped_aligned/batch1/cropped_aligned/'
     trainset = CombineDataset(train_annotation_path, image_path, feature_set, args.length)
     validset = SequenceFeatureABAW5(valid_annotation_path, image_path, abaw5_feature, args.length, 'val')
     
