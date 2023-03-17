@@ -5,10 +5,9 @@ import pickle
 import argparse
 import numpy as np
 from PIL import Image
-from torchvision import transforms
 from tqdm import tqdm
-from torchvision import models
-from torch import nn
+from torch import nn as nn
+from torchvision import transforms
 
 def main():
     DEVICE = 'cuda'
@@ -16,61 +15,33 @@ def main():
 
     parser = argparse.ArgumentParser(description='Generate image feature')
     parser.add_argument('--extractor', default='enet_b0_8_best_vgaf.pt', help='Extractor name')
-    parser.add_argument('--netdir', default='../MTL-ABAW4/model/', help='Extractor name')
+    parser.add_argument('--args.netdir', default='../MTL-ABAW4/model/', help='Extractor name')
     parser.add_argument('--output', default='abaw5.pickle', help='Output file name')
     parser.add_argument('--batch', type=int, default=64, help='Batch size')
     parser.add_argument('--datadir', default='../../../Data/ABAW5/cropped_aligned/batch1/', help='Data folder path')
-    parser.add_argument('--augment', default=False, action='store_true', help='Augment data')
     parser.add_argument('--score', default=False, action='store_true', help='Concatenate score')
 
     args = parser.parse_args()
-    netdir = args.netdir
-    data_dir = args.datadir
-    batch_size = args.batch
-    output_name = args.output
-    extractor_name = args.extractor
+    transform = transforms.Compose(
+        [
+            transforms.Resize([int(IMG_SIZE * 1.02), int(IMG_SIZE * 1.02)]),
+            transforms.RandomCrop([IMG_SIZE, IMG_SIZE]),
+            transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std =[0.229, 0.224, 0.225])
+        ]
+    )
 
-    if args.augment:
-        transform = transforms.Compose(
-            [
-                transforms.Resize([int(IMG_SIZE * 1.02), int(IMG_SIZE * 1.02)]),
-                transforms.RandomCrop([IMG_SIZE, IMG_SIZE]),
-                transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std =[0.229, 0.224, 0.225])
-            ]
-        )
-    else:
-        transform = transforms.Compose(
-            [
-                transforms.Resize((IMG_SIZE, IMG_SIZE)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                    std=[0.229, 0.224, 0.225])
-            ]
-        )
-
-    if extractor_name == 'resnet18_msceleb.pth':
-        resnet = models.resnet18(True)
-        checkpoint = torch.load(netdir + extractor_name)
-        resnet.load_state_dict(checkpoint['state_dict'],strict=True)
-        model = nn.Sequential(*list(resnet.children())[:-2])
-    elif extractor_name == 'enet_b2_8.pt':
-        model = torch.load(netdir + extractor_name)
-        classifier_bias = model.classifier.bias.cpu().data.numpy()
-        classifier_weights = model.classifier.weight.cpu().data.numpy()
-        model.classifier = torch.nn.Identity()        
-    else:
-        model = torch.load(netdir + extractor_name)
-        classifier_bias = model.classifier[0].bias.cpu().data.numpy()
-        classifier_weights = model.classifier[0].weight.cpu().data.numpy()
-        model.classifier = torch.nn.Identity()
+    model = torch.load(args.netdir + args.extractor)
+    classifier_bias = model.classifier[0].bias.cpu().data.numpy()
+    classifier_weights = model.classifier[0].weight.cpu().data.numpy()
+    model.classifier = nn.Identity()
 
     model = nn.DataParallel(model)
     model = model.to(DEVICE)
     model.eval()
-    image_dir = os.path.join(data_dir, 'cropped_aligned')
+    image_dir = os.path.join(args.datadir, 'cropped_aligned')
 
     imgs = []
     img_names = []
@@ -85,7 +56,7 @@ def main():
                 if img.size:
                     img_names.append(filename + '/' + img_name)
                     imgs.append(img_tensor)
-                    if len(imgs) >= batch_size:
+                    if len(imgs) >= args.batch:
                         features = model(torch.stack(imgs, dim=0).to(DEVICE))
                         features = features.data.cpu().numpy()
                         
@@ -112,7 +83,7 @@ def main():
     else:
         feature_dict = {img_name: global_features for img_name, global_features in zip(img_names, X_global_features)}
 
-    with open(os.path.join(data_dir, output_name), 'wb') as handle:
+    with open(os.path.join(args.datadir, args.output), 'wb') as handle:
         pickle.dump(feature_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 

@@ -29,7 +29,6 @@ Evaluation metrics on Aff-Wild2 Validation set
 | Effnet+Transformer Encoder (N=4, h=4), Augment (1) | 44.00 |
 | Effnet+Transformer Encoder (N=4, h=8) , Augment (2) | 44.24 |
 | Effnet+Transformer Encoder (N=6, h=4) , Augment (3) | **45.55** |
-| Effnet+Transformer Encoder-Decoder, Augment | 39.72 |
 
 
 Ensemble

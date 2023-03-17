@@ -1,4 +1,3 @@
-import torch
 import math
 import torch.nn as nn
 
@@ -54,48 +53,6 @@ class Attention(nn.Module):
         attention_weighted_encoding = (encoder_out * alpha.unsqueeze(2)).sum(dim=1)  # (batch_size, encoder_dim)
 
         return attention_weighted_encoding, alpha
-
-class AFER(nn.Module):
-    def __init__(self, num_class=8, train_backbone=False):
-        super(AFER, self).__init__()
-
-        self.backbone = torch.load('../MTL-ABAW3/model/enet_b0_8_best_vgaf.pt')
-        self.pooling = self.backbone.global_pool
-        self.classifier = self.backbone.classifier[0]
-
-        dim_score, dim_embedding = self.classifier.weight.data.shape
-        feature_size = dim_score + dim_embedding
-
-        self.attention = Attention(dim_embedding, 128)
-        self.ex = Dense(feature_size, num_class, activation='softmax', drop=0.2)
-        self.ex = nn.Sequential(
-            Dense(feature_size, 512, activation='relu', drop=0.2),
-            Dense(512, 64, activation='relu', drop=0.2),
-            Dense(64, num_class, activation='softmax'),
-        )
-
-        self.backbone.global_pool = torch.nn.Identity()
-        self.backbone.classifier  = torch.nn.Identity()
-
-        if train_backbone == False:
-            self.freeze_backbone()
-
-    def forward(self, x):
-        x = self.backbone(x)
-        b, c, h, w = x.shape
-        embedding = x.view(b, c, -1).permute(0, 2, 1)
-        ex, a_ex = self.attention(embedding)
-        score = self.classifier(self.pooling(x))
-        ex = torch.cat((ex, score), dim=-1)
-        ex = self.ex(ex)
-        return ex
-
-    def freeze_backbone(self):
-        for p in self.backbone.parameters():
-            p.requires_grad = False
-        for p in self.classifier.parameters():
-            p.requires_grad = False
-
 
 class MLP(nn.Module):
     def __init__(self, num_class=8, feature_size=1288):

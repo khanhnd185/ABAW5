@@ -2,7 +2,8 @@ import os
 import pickle
 import argparse
 from tqdm import tqdm
-from lstm import SequenceFeatureABAW5
+from torch import nn as nn
+from dataset import SequenceFeatureABAW5
 from transformer import Transformer
 from torch.utils.data import DataLoader
 from helpers import *
@@ -35,7 +36,7 @@ def val(net1, net2, net3, validldr):
     all_yhat = all_yhat.cpu().numpy()
     print(type(all_y), type(all_yhat))
     print((all_y.shape), (all_yhat.shape))
-    metrics = EX_metric(all_y, all_yhat)
+    metrics = ex_metric(all_y, all_yhat)
     return metrics
 
 def vote(net1, net2, net3, validldr):
@@ -93,7 +94,7 @@ def vote(net1, net2, net3, validldr):
         all_yhat.append(onehot)
         
     all_yhat = np.array(all_yhat)
-    metrics = EX_metric(all_y, all_yhat)
+    metrics = ex_metric(all_y, all_yhat)
     return metrics
 
 

@@ -29,19 +29,6 @@ class Encoder(nn.Module):
             x = layer(x, mask)
         return self.norm(x)
 
-class Decoder(nn.Module):
-    "Generic N layer decoder with masking."
-    def __init__(self, size, h, feed_forward, dropout, N):
-        super(Decoder, self).__init__()
-        layer = DecoderLayer(size, h, feed_forward, dropout)
-        self.layers = clones(layer, N)
-        self.norm = LayerNorm(layer.size)
-
-    def forward(self, x, memory, src_mask=None, tgt_mask=None):
-        for layer in self.layers:
-            x = layer(x, memory, src_mask, tgt_mask)
-        return self.norm(x)
-
 class Transformer(nn.Module):
     def __init__(self, input, output, size, h, feed_forward, dropout, N):
         super(Transformer, self).__init__()
@@ -88,31 +75,6 @@ class EncoderLayer(nn.Module):
         x = x + self.drop1(self.self_attn(x1, x1, x1, mask))
         x2 = self.norm2(x)
         x = x + self.drop2(self.feed_forward(x2))
-        return x
-
-class DecoderLayer(nn.Module):
-    "Decoder is made of self-attn, src-attn, and feed forward (defined below)"
-    def __init__(self, size, h, feed_forward, dropout):
-        super(DecoderLayer, self).__init__()
-        self.size = size
-        self.self_attn = MultiHeadedAttention(h, size)
-        self.src_attn = MultiHeadedAttention(h, size)
-        self.feed_forward = PositionwiseFeedForward(size, feed_forward, dropout)
-        self.norm1 = LayerNorm(size)
-        self.norm2 = LayerNorm(size)
-        self.norm3 = LayerNorm(size)
-        self.drop1 = nn.Dropout(dropout)
-        self.drop2 = nn.Dropout(dropout)
-        self.drop3 = nn.Dropout(dropout)
-
-    def forward(self, x, memory, src_mask, tgt_mask):
-        m = memory
-        x1 = self.norm1(x)
-        x = x + self.drop1(self.self_attn(x1, x1, x1, tgt_mask))
-        x2 = self.norm2(x)
-        x = x + self.drop2(self.self_attn(x2, m, m, src_mask))
-        x3 = self.norm3(x)
-        x = x + self.drop3(self.feed_forward(x3))
         return x
 
 def attention(query, key, value, mask=None, dropout=None):

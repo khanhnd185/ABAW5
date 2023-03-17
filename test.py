@@ -2,7 +2,8 @@ import os
 import pickle
 import argparse
 from tqdm import tqdm
-from lstm import SequenceFeatureABAW5
+from torch import nn as nn
+from dataset import SequenceFeatureABAW5
 from transformer import Transformer
 from torch.utils.data import DataLoader
 from helpers import *

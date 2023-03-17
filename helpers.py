@@ -1,16 +1,7 @@
-from math import cos, pi
-from re import S
 import torch
-from torchvision import transforms
-from PIL import Image
-import torch.nn as nn
-import numpy as np
-import torch.nn.functional as F
-import torch 
-import torch.nn as nn
-import torch.nn.functional as F
+import numpy as np 
+from math import cos, pi
 from sklearn.metrics import f1_score
-import numpy as np
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -51,20 +42,7 @@ def load_state_dict(model,path):
     model.load_state_dict(new_state_dict,strict=False)
     return model
 
-EPS = 1e-8
-
-class MaskedCELoss(nn.Module):
-    def __init__(self, weight=None, ignore_index=-1):
-        super(MaskedCELoss, self).__init__() 
-        self.ce = nn.CrossEntropyLoss(reduction='none', weight=weight, ignore_index=ignore_index)
-    
-    def forward(self, x, y, mask):
-        loss = self.ce(x, y)
-        loss = loss.mean(dim=-1)
-        loss = loss * mask
-        return loss.sum() / (mask.sum() + EPS)
-
-def EX_metric(y, yhat):
+def ex_metric(y, yhat):
     i = np.argmax(yhat, axis=1)
     yhat = np.zeros(yhat.shape)
     yhat[np.arange(len(i)), i] = 1
