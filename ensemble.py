@@ -18,10 +18,10 @@ def val(net1, net2, net3, validldr):
             y = y.float()
             inputs = inputs.cuda()
             y = y.cuda()
-            #yhat1 = net1(inputs)
+            yhat1 = net1(inputs)
             yhat2 = net2(inputs)
             yhat3 = net3(inputs)
-            yhat = (yhat2 + yhat3) / 2
+            yhat = (yhat1 + yhat2 + yhat3) / 3
             y = y.squeeze(0)
             yhat = yhat.squeeze(0)
 
