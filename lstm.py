@@ -81,7 +81,7 @@ def get_temporal_abaw5_dataset(annotation_path, img_path, dict1, dict2, max_leng
 
     return X, Y
 
-def get_temporal_test_abaw5_dataset(annotation_path, img_path, feature_dict, max_length):
+def get_temporal_test_abaw5_dataset(annotation_path, img_path, dict1, dict2, max_length):
     X, Y = [], []
     filenames = os.listdir(annotation_path)
 
@@ -112,9 +112,16 @@ def get_temporal_test_abaw5_dataset(annotation_path, img_path, feature_dict, max
                     imagepath = os.path.join(img_path, imagename)
                     file_exist = os.path.isfile(imagepath)
 
-            x.append(np.expand_dims(np.concatenate((feature_dict[imagename][0], feature_dict[imagename][1])), axis=0))
-            y.append("{}/{}.jpg".format(filename[:-4], name))
-            leng = leng + 1
+            if imagename in dict1:
+                x.append(np.expand_dims(np.concatenate((dict1[imagename][0], dict1[imagename][1])), axis=0))
+                y.append("{}/{}.jpg".format(filename[:-4], name))
+                leng = leng + 1
+            elif imagename in dict2:
+                x.append(np.expand_dims(np.concatenate((dict2[imagename][0], dict2[imagename][1])), axis=0))
+                y.append("{}/{}.jpg".format(filename[:-4], name))
+                leng = leng + 1
+            else:
+                print("No image in feature dict")
 
 
             if leng == max_length or (i == (len(lines) - 1)):

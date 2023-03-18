@@ -15,13 +15,13 @@ def val(net1, net2, net3, validldr):
     all_yhat = None
     for batch_idx, (inputs, y) in enumerate(tqdm(validldr)):
         with torch.no_grad():
-            y = y.long()
+            y = y.float()
             inputs = inputs.cuda()
             y = y.cuda()
-            yhat1 = net1(inputs)
+            #yhat1 = net1(inputs)
             yhat2 = net2(inputs)
             yhat3 = net3(inputs)
-            yhat = (yhat1 + yhat2 + yhat3) / 3
+            yhat = (yhat2 + yhat3) / 2
             y = y.squeeze(0)
             yhat = yhat.squeeze(0)
 
@@ -35,7 +35,7 @@ def val(net1, net2, net3, validldr):
     all_yhat = all_yhat.cpu().numpy()
     print(type(all_y), type(all_yhat))
     print((all_y.shape), (all_yhat.shape))
-    metrics = EX_metric(all_y, all_yhat)
+    metrics, _ = va_metric(all_y, all_yhat)
     return metrics
 
 def vote(net1, net2, net3, validldr):
@@ -100,25 +100,27 @@ def vote(net1, net2, net3, validldr):
 def main():
     parser = argparse.ArgumentParser(description='Train Emotion')
 
-    parser.add_argument('--net1', default='transformer-CombineDataset-83dd7186', help='Net name')
-    parser.add_argument('--net2', default='transformer-CombineDataset-83dd7186-h8', help='Net name')
-    parser.add_argument('--net3', default='transformer-CombineDataset-83dd7186-N6', help='Net name')
+    parser.add_argument('--net1', default='transformer-VAFeatureABAW5-889c71ad', help='Net name')
+    parser.add_argument('--net2', default='transformer-VAFeatureABAW5-889c71ad-h8', help='Net name')
+    parser.add_argument('--net3', default='transformer-VAFeatureABAW5-889c71ad-N6', help='Net name')
     parser.add_argument('--datadir', default='../../../Data/ABAW5/', help='Dataset folder')
     parser.add_argument('--length', default=64, type=int, help="max sequence length")
     args = parser.parse_args()
 
-    valid_annotation_path = args.datadir + 'annotations/EX/Validation_Set/'
+    valid_annotation_path = args.datadir + 'annotations/VA/Validation_Set/'
 
     with open(os.path.join(args.datadir, 'cropped_aligned/batch1/abaw5.pickle'), 'rb') as handle:
-        abaw5_feature = pickle.load(handle)
+        abaw5_feature1 = pickle.load(handle)
+    with open(os.path.join(args.datadir, 'cropped_aligned/batch2/abaw52.pickle'), 'rb') as handle:
+        abaw5_feature2 = pickle.load(handle)
 
     image_path = args.datadir + 'cropped_aligned/batch1/cropped_aligned/'
-    validset = SequenceFeatureABAW5(valid_annotation_path, image_path, abaw5_feature, args.length, 'val')
+    validset = SequenceFeatureABAW5(valid_annotation_path, image_path, abaw5_feature1, abaw5_feature2, args.length, 'val')
     validldr = DataLoader(validset, batch_size=1, shuffle=False, num_workers=0)
 
-    net1 = Transformer(1288, 8, 512, 4, 512, 0.1, 4)
-    net2 = Transformer(1288, 8, 512, 8, 512, 0.1, 4)
-    net3 = Transformer(1288, 8, 512, 4, 512, 0.1, 6)
+    net1 = Transformer(1288, 2, 512, 4, 512, 0.1, 4)
+    net2 = Transformer(1288, 2, 512, 8, 512, 0.1, 4)
+    net3 = Transformer(1288, 2, 512, 4, 512, 0.1, 6)
 
     net1 = load_state_dict(net1, 'results/' + args.net1 + '/best_val_perform.pth')
     net2 = load_state_dict(net2, 'results/' + args.net2 + '/best_val_perform.pth')
@@ -129,7 +131,7 @@ def main():
     net3 = nn.DataParallel(net3).cuda()
 
     val_metrics = val(net1, net2, net3, validldr)
-    print('F1-score {:.5f}'.format(val_metrics))
+    print('CCC {:.5f}'.format(val_metrics))
 
 
 if __name__=="__main__":
