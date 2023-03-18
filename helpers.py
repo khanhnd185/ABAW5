@@ -64,20 +64,39 @@ class MaskedCELoss(nn.Module):
         loss = loss * mask
         return loss.sum() / (mask.sum() + EPS)
 
-def EX_metric(y, yhat):
-    i = np.argmax(yhat, axis=1)
-    yhat = np.zeros(yhat.shape)
-    yhat[np.arange(len(i)), i] = 1
 
-    if not len(y.shape) == 1:
-        if y.shape[1] == 1:
-            y = y.reshape(-1)
-        else:
-            y = np.argmax(y, axis=-1)
-    if not len(yhat.shape) == 1:
-        if yhat.shape[1] == 1:
-            yhat = yhat.reshape(-1)
-        else:
-            yhat = np.argmax(yhat, axis=-1)
+def au_metric(y, yhat, thresh=0.5):
+    yhat = (yhat >= thresh)
+    N, label_size = y.shape
+    f1s = []
+    for i in range(label_size):
+        f1 = f1_score(y[:, i], yhat[:, i])
+        f1s.append(f1)
+    return np.mean(f1s), f1s
 
-    return f1_score(y, yhat, average='macro')
+class WeightedAsymmetricLoss(nn.Module):
+    def __init__(self, eps=1e-8, disable_torch_grad=True, weight=None):
+        super(WeightedAsymmetricLoss, self).__init__()
+        self.disable_torch_grad = disable_torch_grad
+        self.eps = eps
+        self.weight = weight
+
+    def forward(self, x, y, mask):
+        xs_pos = x
+        xs_neg = 1 - x
+        los_pos = y * torch.log(xs_pos.clamp(min=self.eps))
+        los_neg = (1 - y) * torch.log(xs_neg.clamp(min=self.eps))
+
+        if self.disable_torch_grad:
+            torch.set_grad_enabled(False)
+        neg_weight = 1 - xs_neg
+        if self.disable_torch_grad:
+            torch.set_grad_enabled(True)
+        loss = los_pos + neg_weight * los_neg
+
+        if self.weight is not None:
+            loss = loss * self.weight.view(1,-1)
+
+        loss = loss.mean(dim=-1)
+        loss = loss * mask
+        return -loss.sum() / (mask.sum() + EPS)

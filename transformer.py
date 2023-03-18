@@ -50,7 +50,7 @@ class Transformer(nn.Module):
         self.head = nn.Sequential(
             Dense(512, 256, activation='relu', drop=0.2),
             Dense(256, 64, activation='relu', drop=0.2),
-            Dense(64, output),
+            Dense(64, output, activation='sigmoid'),
         )
         
     def forward(self, x):

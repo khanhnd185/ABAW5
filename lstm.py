@@ -29,9 +29,10 @@ def get_temporal_abaw5_dataset(annotation_path, img_path, feature_dict, max_leng
             lines = f.read().splitlines()[1:]
 
         x, y, leng = [], [], 0
-        for i, label in enumerate(lines):
-            expression = int(label)
-            if expression >= 0:
+        for i, line in enumerate(lines):
+            aus = line.split(',') 
+            aus = [int(au) for au in aus]
+            if aus[0] >= 0:
                 j = i
                 overflow = False
                 file_exist = False
@@ -54,7 +55,7 @@ def get_temporal_abaw5_dataset(annotation_path, img_path, feature_dict, max_leng
                         file_exist = os.path.isfile(imagepath)
 
                 x.append(np.expand_dims(np.concatenate((feature_dict[imagename][0], feature_dict[imagename][1])), axis=0))
-                y.append(expression)
+                y.append(aus)
                 leng = leng + 1
 
             if leng < max_length and (i == (len(lines) - 1)) and split == 'train':
@@ -157,6 +158,16 @@ class SequenceFeatureABAW5(Dataset):
 
     def __len__(self):
         return len(self.X)
+
+    def au_weight(self):
+        y = torch.Tensor(self.y)
+        print(y.shape)
+        y = torch.flatten(y, start_dim=0, end_dim=1)
+        print(y.shape)
+        y = y.numpy()
+        weight = 1.0 / np.sum(y, axis=0)
+        weight = weight / weight.sum() * y.shape[1]
+        return weight
 
 class LSTM(nn.Module):
     def __init__(self, num_class=8, feature_size=1288):
