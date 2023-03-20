@@ -34,25 +34,26 @@ def test(net1, net2, net3, validldr):
 
 def generate_output(filename, imagenames, predictions):
     with open(filename, 'w') as f:
-        f.write("image_location,Neutral,Anger,Disgust,Fear,Happiness,Sadness,Surprise,Other\n")
+        f.write("image_location,AU1,AU2,AU4,AU6,AU7,AU10,AU12,AU15,AU23,AU24,AU25,AU26\n")
 
         for i, name in enumerate(imagenames):
-            infostr = '{},{}\n'.format(name, np.argmax(predictions[i,:]))
+            a = (predictions[i,:] >= 0.5) * 1
+            infostr = '{},{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(name, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11])
             f.write(infostr)
 
 
 def main():
     parser = argparse.ArgumentParser(description='Train Emotion')
 
-    parser.add_argument('--net1', default='transformer-CombineDataset-83dd7186', help='Net name')
-    parser.add_argument('--net2', default='transformer-CombineDataset-83dd7186-h8', help='Net name')
-    parser.add_argument('--net3', default='transformer-CombineDataset-83dd7186-N6', help='Net name')
+    parser.add_argument('--net1', default='transformer-AUFeatureABAW5-80004e40', help='Net name')
+    parser.add_argument('--net2', default='transformer-AUFeatureABAW5-80004e40-h8', help='Net name')
+    parser.add_argument('--net3', default='transformer-AUFeatureABAW5-80004e40-N6', help='Net name')
     parser.add_argument('--output', default='predictions', help='Output name')
     parser.add_argument('--datadir', default='../../../Data/ABAW5/', help='Dataset folder')
     parser.add_argument('--length', default=64, type=int, help="max sequence length")
     args = parser.parse_args()
 
-    valid_annotation_path = args.datadir + 'testset/framelist/'
+    valid_annotation_path = args.datadir + 'testset/framelist_au/'
 
     with open(os.path.join(args.datadir, 'cropped_aligned/batch1/abaw5.pickle'), 'rb') as handle:
         abaw5_feature = pickle.load(handle)
@@ -61,9 +62,9 @@ def main():
     validset = SequenceFeatureABAW5(valid_annotation_path, image_path, abaw5_feature, args.length, 'test')
     validldr = DataLoader(validset, batch_size=1, shuffle=False, num_workers=0)
 
-    net1 = Transformer(1288, 8, 512, 4, 512, 0.1, 4)
-    net2 = Transformer(1288, 8, 512, 8, 512, 0.1, 4)
-    net3 = Transformer(1288, 8, 512, 4, 512, 0.1, 6)
+    net1 = Transformer(1288, 12, 512, 4, 512, 0.1, 4)
+    net2 = Transformer(1288, 12, 512, 8, 512, 0.1, 4)
+    net3 = Transformer(1288, 12, 512, 4, 512, 0.1, 6)
 
     net1 = load_state_dict(net1, 'results/' + args.net1 + '/best_val_perform.pth')
     net2 = load_state_dict(net2, 'results/' + args.net2 + '/best_val_perform.pth')
